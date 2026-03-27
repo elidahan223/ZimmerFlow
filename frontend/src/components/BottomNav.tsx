@@ -1,38 +1,64 @@
 import { CalendarDays, Home, Settings } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import type { View } from '../App'
+import type { View, CompoundTab } from '../App'
 
 interface Props {
   view: View
   setView: (v: View) => void
-  compoundName?: string
+  compounds: CompoundTab[]
+  selectedCompoundId: string | null
+  onSelectCompound: (id: string) => void
 }
 
-export default function BottomNav({ view, setView, compoundName }: Props) {
+export default function BottomNav({ view, setView, compounds, selectedCompoundId, onSelectCompound }: Props) {
   const auth = useAuth()
-  const tabs = [
-    { id: 'gallery' as View, label: compoundName || 'חדרים', icon: Home },
-    { id: 'calendar' as View, label: 'לוח שנה', icon: CalendarDays },
-    ...(auth.isAuthenticated ? [{ id: 'settings' as View, label: 'הגדרות', icon: Settings }] : []),
+
+  const compoundTabs = compounds.map((c) => ({
+    id: c.id,
+    label: c.name,
+    icon: Home,
+    type: 'compound' as const,
+  }))
+
+  const otherTabs = [
+    { id: 'calendar', label: 'לוח שנה', icon: CalendarDays, type: 'view' as const },
+    ...(auth.isAuthenticated ? [{ id: 'settings', label: 'הגדרות', icon: Settings, type: 'view' as const }] : []),
   ]
+
+  const allTabs = [...compoundTabs, ...otherTabs]
+
+  function handleClick(tab: typeof allTabs[number]) {
+    if (tab.type === 'compound') {
+      onSelectCompound(tab.id)
+    } else {
+      setView(tab.id as View)
+    }
+  }
+
+  function isActive(tab: typeof allTabs[number]) {
+    if (tab.type === 'compound') {
+      return view === 'gallery' && selectedCompoundId === tab.id
+    }
+    return view === tab.id
+  }
 
   return (
     <>
       {/* Mobile bottom nav */}
       <div className="sm:hidden fixed bottom-0 right-0 left-0 z-50 bg-white/95 backdrop-blur-sm border-t border-neutral-100 safe-area-bottom">
-        <div className="flex">
-          {tabs.map((tab) => {
-            const active = view === tab.id
+        <div className="flex overflow-x-auto no-scrollbar">
+          {allTabs.map((tab) => {
+            const active = isActive(tab)
             return (
               <button
                 key={tab.id}
-                onClick={() => setView(tab.id)}
-                className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 transition-colors ${
+                onClick={() => handleClick(tab)}
+                className={`flex-1 min-w-0 flex flex-col items-center gap-0.5 py-2.5 px-1 transition-colors ${
                   active ? 'text-neutral-900' : 'text-neutral-400'
                 }`}
               >
                 <tab.icon className="w-5 h-5" strokeWidth={active ? 2.2 : 1.5} />
-                <span className="text-[10px] font-medium">{tab.label}</span>
+                <span className="text-[10px] font-medium truncate max-w-full">{tab.label}</span>
               </button>
             )
           })}
@@ -41,13 +67,13 @@ export default function BottomNav({ view, setView, compoundName }: Props) {
 
       {/* Desktop top tabs (inside navbar area) */}
       <div className="hidden sm:flex fixed top-0 left-1/2 -translate-x-1/2 z-50 h-14 items-center gap-1">
-        {tabs.map((tab) => {
-          const active = view === tab.id
+        {allTabs.map((tab) => {
+          const active = isActive(tab)
           return (
             <button
               key={tab.id}
-              onClick={() => setView(tab.id)}
-              className={`flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-all ${
+              onClick={() => handleClick(tab)}
+              className={`flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
                 active
                   ? 'bg-neutral-900 text-white'
                   : 'text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50'
