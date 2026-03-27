@@ -1,0 +1,219 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  cognitoSub   String?  @unique @map("cognito_sub")
+  firstName    String   @map("first_name")
+  lastName     String   @map("last_name")
+  email        String?  @unique
+  phone        String?
+  idNumber     String?  @map("id_number")
+  address      String?
+  role         Role     @default(OWNER)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  auditLogs      AuditLog[]
+  createdBookings Booking[] @relation("CreatedByUser")
+
+  @@map("users")
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  fullName  String   @map("full_name")
+  phone     String
+  email     String?
+  idNumber  String?  @map("id_number")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  bookings      Booking[]
+  notifications Notification[]
+
+  @@map("customers")
+}
+
+model Compound {
+  id              String      @id @default(uuid())
+  name            String
+  description     String?
+  tagline         String?
+  capacity        Int
+  status          CabinStatus @default(ACTIVE)
+  weekdayPrice    Decimal     @map("weekday_price")
+  weekendPrice    Decimal     @map("weekend_price")
+  holidayPrice    Decimal?    @map("holiday_price")
+  yardDescription String?     @map("yard_description")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  rooms              Room[]
+  bookings           Booking[]
+  availabilityBlocks AvailabilityBlock[]
+  images             CompoundImage[]
+
+  @@map("compounds")
+}
+
+model Room {
+  id          String   @id @default(uuid())
+  compoundId  String   @map("compound_id")
+  name        String
+  description String?
+  capacity    Int?
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  compound Compound @relation(fields: [compoundId], references: [id])
+
+  @@map("rooms")
+}
+
+model CompoundImage {
+  id         String   @id @default(uuid())
+  compoundId String   @map("compound_id")
+  url        String
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  compound Compound @relation(fields: [compoundId], references: [id])
+
+  @@map("compound_images")
+}
+
+model Booking {
+  id              String        @id @default(uuid())
+  customerId      String        @map("customer_id")
+  compoundId      String        @map("compound_id")
+  createdByUserId String        @map("created_by_user_id")
+  checkIn         DateTime      @map("check_in")
+  checkOut        DateTime      @map("check_out")
+  guestsCount     Int           @map("guests_count")
+  status          BookingStatus @default(PENDING)
+  customerNotes   String?       @map("customer_notes")
+  adminNotes      String?       @map("admin_notes")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  completedAt     DateTime?     @map("completed_at")
+  cancelledAt     DateTime?     @map("cancelled_at")
+
+  customer      Customer       @relation(fields: [customerId], references: [id])
+  compound      Compound       @relation(fields: [compoundId], references: [id])
+  createdByUser User           @relation("CreatedByUser", fields: [createdByUserId], references: [id])
+  contracts     Contract[]
+  notifications Notification[]
+
+  @@map("bookings")
+}
+
+model AvailabilityBlock {
+  id         String   @id @default(uuid())
+  compoundId String   @map("compound_id")
+  startDate  DateTime @map("start_date")
+  endDate    DateTime @map("end_date")
+  blockType  String   @map("block_type")
+  reason     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  compound Compound @relation(fields: [compoundId], references: [id])
+
+  @@map("availability_blocks")
+}
+
+model Contract {
+  id              String         @id @default(uuid())
+  bookingId       String         @map("booking_id")
+  contractNumber  String         @map("contract_number")
+  templateVersion String         @map("template_version")
+  status          ContractStatus @default(DRAFT)
+  fileUrl         String?        @map("file_url")
+  signedFileUrl   String?        @map("signed_file_url")
+  generatedAt     DateTime       @default(now()) @map("generated_at")
+  signedAt        DateTime?      @map("signed_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  booking         Booking          @relation(fields: [bookingId], references: [id])
+  signatureEvents SignatureEvent[]
+
+  @@map("contracts")
+}
+
+model SignatureEvent {
+  id         String   @id @default(uuid())
+  contractId String   @map("contract_id")
+  eventType  String   @map("event_type")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  metadata   Json?
+  eventTime  DateTime @default(now()) @map("event_time")
+
+  contract Contract @relation(fields: [contractId], references: [id])
+
+  @@map("signature_events")
+}
+
+model Notification {
+  id             String   @id @default(uuid())
+  bookingId      String   @map("booking_id")
+  customerId     String   @map("customer_id")
+  type           String
+  channel        String
+  status         String
+  messageContent String?  @map("message_content")
+  sentAt         DateTime? @map("sent_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  booking  Booking  @relation(fields: [bookingId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String   @map("actor_user_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  details    Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  actor User @relation(fields: [actorId], references: [id])
+
+  @@map("audit_logs")
+}
+
+enum Role {
+  ADMIN
+  OWNER
+}
+
+enum CabinStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum ContractStatus {
+  DRAFT
+  SENT
+  SIGNED
+  EXPIRED
+}
