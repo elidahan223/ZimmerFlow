@@ -1,15 +1,19 @@
-import { CalendarDays, Home } from 'lucide-react'
+import { CalendarDays, Home, Settings } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 import type { View } from '../App'
 
 interface Props {
   view: View
   setView: (v: View) => void
+  compoundName?: string
 }
 
-export default function BottomNav({ view, setView }: Props) {
+export default function BottomNav({ view, setView, compoundName }: Props) {
+  const auth = useAuth()
   const tabs = [
-    { id: 'gallery' as View, label: 'חדרים', icon: Home },
+    { id: 'gallery' as View, label: compoundName || 'חדרים', icon: Home },
     { id: 'calendar' as View, label: 'לוח שנה', icon: CalendarDays },
+    ...(auth.isAuthenticated ? [{ id: 'settings' as View, label: 'הגדרות', icon: Settings }] : []),
   ]
 
   return (

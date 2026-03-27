@@ -20,6 +20,7 @@ interface AuthContextType {
   signup: (data: SignupData) => Promise<{ needsConfirmation: boolean; phone: string }>
   confirmCode: (phone: string, code: string) => Promise<void>
   logout: () => void
+  getValidToken: () => Promise<string>
   showAuth: 'login' | 'signup' | 'confirm' | null
   setShowAuth: (v: 'login' | 'signup' | 'confirm' | null) => void
   pendingPhone: string
@@ -108,6 +109,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!res.ok) throw new Error(data.error)
   }
 
+  const refreshAccessToken = async (): Promise<string | null> => {
+    if (!user?.refreshToken) return null
+    try {
+      const res = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: user.refreshToken }),
+      })
+      if (!res.ok) {
+        logout()
+        return null
+      }
+      const data = await res.json()
+      const updated = { ...user, accessToken: data.accessToken, idToken: data.idToken }
+      setUser(updated)
+      localStorage.setItem('zimmerflow_auth', JSON.stringify(updated))
+      return data.accessToken
+    } catch {
+      logout()
+      return null
+    }
+  }
+
+  const getValidToken = async (): Promise<string> => {
+    if (!user?.accessToken) return ''
+    // Check if token is about to expire (decode JWT exp)
+    try {
+      const payload = JSON.parse(atob(user.accessToken.split('.')[1]))
+      const now = Math.floor(Date.now() / 1000)
+      if (payload.exp && payload.exp - now < 300) {
+        // Less than 5 minutes left, refresh
+        const newToken = await refreshAccessToken()
+        return newToken || ''
+      }
+    } catch {
+      // If decode fails, try refresh
+      const newToken = await refreshAccessToken()
+      return newToken || ''
+    }
+    return user.accessToken
+  }
+
   const logout = () => {
     setUser(null)
     localStorage.removeItem('zimmerflow_auth')
@@ -122,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signup,
       confirmCode,
       logout,
+      getValidToken,
       showAuth,
       setShowAuth,
       pendingPhone,

@@ -47,7 +47,7 @@ model Compound {
   description     String?
   tagline         String?
   capacity        Int
-  status          CabinStatus @default(ACTIVE)
+  status          CompoundStatus @default(ACTIVE)
   weekdayPrice    Decimal     @map("weekday_price")
   weekendPrice    Decimal     @map("weekend_price")
   holidayPrice    Decimal?    @map("holiday_price")
@@ -72,7 +72,8 @@ model Room {
   sortOrder   Int      @default(0) @map("sort_order")
   createdAt   DateTime @default(now()) @map("created_at")
 
-  compound Compound @relation(fields: [compoundId], references: [id])
+  compound Compound @relation(fields: [compoundId], references: [id], onDelete: Cascade)
+  images   RoomImage[]
 
   @@map("rooms")
 }
@@ -84,9 +85,21 @@ model CompoundImage {
   sortOrder  Int      @default(0) @map("sort_order")
   createdAt  DateTime @default(now()) @map("created_at")
 
-  compound Compound @relation(fields: [compoundId], references: [id])
+  compound Compound @relation(fields: [compoundId], references: [id], onDelete: Cascade)
 
   @@map("compound_images")
+}
+
+model RoomImage {
+  id        String   @id @default(uuid())
+  roomId    String   @map("room_id")
+  url       String
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("room_images")
 }
 
 model Booking {
@@ -198,7 +211,7 @@ enum Role {
   OWNER
 }
 
-enum CabinStatus {
+enum CompoundStatus {
   ACTIVE
   INACTIVE
   MAINTENANCE

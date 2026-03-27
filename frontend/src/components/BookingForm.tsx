@@ -56,7 +56,7 @@ export default function BookingForm({ cabins, onClose, onCreated }: Props) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${auth.user?.accessToken}`,
+          'Authorization': `Bearer ${await auth.getValidToken()}`,
         },
         body: JSON.stringify({
           cabinId: form.cabinId,
@@ -83,8 +83,8 @@ export default function BookingForm({ cabins, onClose, onCreated }: Props) {
   const inputClass = "w-full px-4 py-3 rounded-xl border border-neutral-200 bg-neutral-50 text-sm focus:outline-none focus:border-neutral-400 focus:ring-1 focus:ring-neutral-200 transition-all"
 
   return (
-    <div className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto relative">
+    <div className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-6">
+      <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] relative shadow-xl flex flex-col overflow-hidden" dir="rtl">
         <button
           onClick={onClose}
           className="absolute top-4 left-4 text-neutral-400 hover:text-neutral-700 transition-colors z-10"
@@ -92,7 +92,8 @@ export default function BookingForm({ cabins, onClose, onCreated }: Props) {
           <X className="w-5 h-5" />
         </button>
 
-        <div className="p-6 sm:p-8">
+        <div className="overflow-y-auto flex-1" style={{ direction: 'ltr' }}>
+          <div className="p-7" style={{ direction: 'rtl' }}>
           <h2 className="text-xl font-bold text-neutral-900 mb-6 text-center">הזמנה חדשה</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -232,6 +233,7 @@ export default function BookingForm({ cabins, onClose, onCreated }: Props) {
               {loading ? 'שומר...' : 'יצירת הזמנה'}
             </button>
           </form>
+          </div>
         </div>
       </div>
     </div>

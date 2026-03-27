@@ -134,6 +134,25 @@ router.post('/login', async (req, res, next) => {
 
     const result = await cognitoClient.send(authCommand);
 
+    // Ensure user exists in DB (handles DB reset / first login)
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.decode(result.AuthenticationResult.IdToken);
+    if (decoded && decoded.sub) {
+      const existing = await prisma.user.findUnique({ where: { cognitoSub: decoded.sub } });
+      if (!existing) {
+        await prisma.user.create({
+          data: {
+            cognitoSub: decoded.sub,
+            firstName: decoded.name?.split(' ')[0] || 'משתמש',
+            lastName: decoded.name?.split(' ').slice(1).join(' ') || '',
+            email: decoded.email || null,
+            phone: decoded.phone_number || formattedPhone,
+            role: 'OWNER',
+          },
+        });
+      }
+    }
+
     res.json({
       accessToken: result.AuthenticationResult.AccessToken,
       idToken: result.AuthenticationResult.IdToken,
@@ -145,6 +164,36 @@ router.post('/login', async (req, res, next) => {
     }
     if (err.name === 'UserNotConfirmedException') {
       return res.status(403).json({ error: 'יש לאמת את החשבון קודם', needsConfirmation: true });
+    }
+    next(err);
+  }
+});
+
+// POST /api/auth/refresh - רענון טוקן
+router.post('/refresh', async (req, res, next) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'חסר refresh token' });
+    }
+
+    const refreshCommand = new InitiateAuthCommand({
+      ClientId: CLIENT_ID,
+      AuthFlow: 'REFRESH_TOKEN_AUTH',
+      AuthParameters: {
+        REFRESH_TOKEN: refreshToken,
+      },
+    });
+
+    const result = await cognitoClient.send(refreshCommand);
+
+    res.json({
+      accessToken: result.AuthenticationResult.AccessToken,
+      idToken: result.AuthenticationResult.IdToken,
+    });
+  } catch (err) {
+    if (err.name === 'NotAuthorizedException') {
+      return res.status(401).json({ error: 'יש להתחבר מחדש' });
     }
     next(err);
   }

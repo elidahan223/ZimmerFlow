@@ -5,11 +5,13 @@ const cors = require('cors');
 const helmet = require('helmet');
 
 const cabinRoutes = require('./routes/cabins');
+const compoundRoutes = require('./routes/compounds');
 const bookingRoutes = require('./routes/bookings');
 const customerRoutes = require('./routes/customers');
 const contactRoutes = require('./routes/contact');
 const userRoutes = require('./routes/users');
 const authRoutes = require('./routes/auth');
+const imageRoutes = require('./routes/images');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -28,11 +30,13 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api/cabins', cabinRoutes);
+app.use('/api/compounds', compoundRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/images', imageRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

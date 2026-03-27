@@ -46,12 +46,15 @@ export default function Calendar() {
     loadBookings()
   }, [])
 
-  function loadBookings() {
+  async function loadBookings() {
     const headers: Record<string, string> = {}
     let url = '/api/bookings/availability'
-    if (auth.isAuthenticated && auth.user?.accessToken) {
-      headers['Authorization'] = `Bearer ${auth.user.accessToken}`
-      url = '/api/bookings'
+    if (auth.isAuthenticated) {
+      const token = await auth.getValidToken()
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+        url = '/api/bookings'
+      }
     }
     fetch(url, { headers })
       .then(r => r.json())
