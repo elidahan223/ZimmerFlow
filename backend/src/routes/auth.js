@@ -33,11 +33,13 @@ router.post('/signup', async (req, res, next) => {
     // 1. Create user in Cognito
     const userAttributes = [
       { Name: 'phone_number', Value: formattedPhone },
+      { Name: 'given_name', Value: firstName },
+      { Name: 'family_name', Value: lastName },
+      { Name: 'name', Value: `${firstName} ${lastName}` },
     ];
     if (email) {
       userAttributes.push({ Name: 'email', Value: email });
     }
-    userAttributes.push({ Name: 'name', Value: `${firstName} ${lastName}` });
 
     const signUpCommand = new SignUpCommand({
       ClientId: CLIENT_ID,
@@ -58,7 +60,7 @@ router.post('/signup', async (req, res, next) => {
         phone: formattedPhone,
         idNumber: idNumber || null,
         address: address || null,
-        role: 'OWNER',
+        role: 'GUEST',
       },
     });
 
@@ -147,7 +149,7 @@ router.post('/login', async (req, res, next) => {
             lastName: decoded.name?.split(' ').slice(1).join(' ') || '',
             email: decoded.email || null,
             phone: decoded.phone_number || formattedPhone,
-            role: 'OWNER',
+            role: 'GUEST',
           },
         });
       }

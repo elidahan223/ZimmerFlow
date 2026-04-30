@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../config/database');
-const { requireOwner } = require('../middleware/auth');
-const { getUploadUrl, deleteObject } = require('../services/s3');
+const { requireOwner, requireAuth } = require('../middleware/auth');
+const { getUploadUrl, deleteObject, getContractUploadUrl } = require('../services/s3');
 
-// OWNER - קבלת presigned URL להעלאה
+// OWNER - קבלת presigned URL להעלאת תמונות
 router.post('/presign', requireOwner, async (req, res, next) => {
   try {
     const { contentType, folder, fileExtension } = req.body;
@@ -17,6 +17,16 @@ router.post('/presign', requireOwner, async (req, res, next) => {
     }
     const result = await getUploadUrl({ folder, fileExtension, contentType });
     res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// AUTH - presigned URL להעלאת חוזה PDF ל-bucket פרטי (כל משתמש מחובר)
+router.post('/presign-contract', requireAuth, async (req, res, next) => {
+  try {
+    const result = await getContractUploadUrl();
+    res.json(result); // { uploadUrl, key }
   } catch (err) {
     next(err);
   }

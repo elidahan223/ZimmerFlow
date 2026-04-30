@@ -67,7 +67,7 @@ function App() {
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
-      <main className="pt-16 pb-20 sm:pb-6">
+      <main style={{ paddingTop: 80 }} className="pb-20 sm:pb-6">
         {view === 'gallery' && <Gallery compoundId={selectedCompoundId} />}
         {view === 'calendar' && <Calendar />}
         {view === 'settings' && auth.isAuthenticated && <Settings />}

@@ -168,17 +168,17 @@ export default function Gallery({ compoundId }: Props) {
                   )}
                 </h3>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-2 rounded-xl overflow-hidden">
+                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 snap-x snap-mandatory" dir="rtl">
                   {(room.images || []).map((img, imgIdx) => (
                     <div
                       key={img.id}
                       onClick={() => setLightbox(roomStartIdx + imgIdx)}
-                      className="cursor-pointer overflow-hidden"
+                      className="cursor-pointer overflow-hidden rounded-xl shrink-0 snap-start w-64 sm:w-72 lg:w-80"
                     >
                       <img
                         src={img.url}
                         alt={`${room.name} ${imgIdx + 1}`}
-                        className="w-full h-32 sm:h-[180px] lg:h-[200px] object-cover hover:scale-[1.03] transition-transform duration-500 ease-out"
+                        className="w-full h-44 sm:h-52 lg:h-56 object-cover hover:scale-[1.03] transition-transform duration-500 ease-out"
                         loading="lazy"
                       />
                     </div>

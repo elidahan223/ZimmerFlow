@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../config/database');
-const { requireOwner } = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
 
 // POST - נקרא אחרי רישום מוצלח ב-Cognito, שומר את הפרטים ב-DB
-router.post('/register', requireOwner, async (req, res, next) => {
+router.post('/register', requireAuth, async (req, res, next) => {
   try {
     const { firstName, lastName, email, phone, idNumber, address } = req.body;
 
@@ -31,7 +31,7 @@ router.post('/register', requireOwner, async (req, res, next) => {
         phone,
         idNumber,
         address,
-        role: 'OWNER',
+        role: 'GUEST',
       },
     });
 
@@ -42,7 +42,7 @@ router.post('/register', requireOwner, async (req, res, next) => {
 });
 
 // GET - פרטי המשתמש המחובר
-router.get('/me', requireOwner, async (req, res, next) => {
+router.get('/me', requireAuth, async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({
       where: { cognitoSub: req.user.sub },

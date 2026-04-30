@@ -1,14 +1,14 @@
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
-function compressImage(file: File, maxWidth = 1600, quality = 0.8): Promise<File> {
+function compressImage(file: File, maxWidth = 1200, quality = 0.7): Promise<File> {
   return new Promise((resolve) => {
     // Skip non-image or already small files
-    if (!file.type.startsWith('image/') || file.size < 200_000) {
+    if (!file.type.startsWith('image/') || file.size < 100_000) {
       return resolve(file)
     }
     const img = new Image()
     img.onload = () => {
-      const scale = Math.min(1, maxWidth / img.width)
+      const scale = Math.min(1, maxWidth / Math.max(img.width, img.height))
       const w = Math.round(img.width * scale)
       const h = Math.round(img.height * scale)
       const canvas = document.createElement('canvas')
@@ -16,17 +16,24 @@ function compressImage(file: File, maxWidth = 1600, quality = 0.8): Promise<File
       canvas.height = h
       const ctx = canvas.getContext('2d')!
       ctx.drawImage(img, 0, 0, w, h)
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }))
-          } else {
-            resolve(file)
-          }
-        },
-        'image/jpeg',
-        quality
-      )
+
+      // Try progressively lower quality until under 500KB
+      const tryCompress = (q: number) => {
+        canvas.toBlob(
+          (blob) => {
+            if (blob && (blob.size < 500_000 || q <= 0.3)) {
+              resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }))
+            } else if (blob && q > 0.3) {
+              tryCompress(q - 0.1)
+            } else {
+              resolve(file)
+            }
+          },
+          'image/jpeg',
+          q
+        )
+      }
+      tryCompress(quality)
     }
     img.onerror = () => resolve(file)
     img.src = URL.createObjectURL(file)

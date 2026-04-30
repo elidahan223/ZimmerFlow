@@ -21,6 +21,7 @@ export interface Room {
 export interface Compound {
   id: string
   name: string
+  color?: string
   description?: string
   tagline?: string
   capacity: number

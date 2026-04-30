@@ -44,6 +44,7 @@ model Customer {
 model Compound {
   id              String      @id @default(uuid())
   name            String
+  color           String          @default("#3b82f6")
   description     String?
   tagline         String?
   capacity        Int
@@ -72,8 +73,9 @@ model Room {
   sortOrder   Int      @default(0) @map("sort_order")
   createdAt   DateTime @default(now()) @map("created_at")
 
-  compound Compound @relation(fields: [compoundId], references: [id], onDelete: Cascade)
-  images   RoomImage[]
+  compound     Compound      @relation(fields: [compoundId], references: [id], onDelete: Cascade)
+  images       RoomImage[]
+  bookingRooms BookingRoom[]
 
   @@map("rooms")
 }
@@ -110,6 +112,8 @@ model Booking {
   checkIn         DateTime      @map("check_in")
   checkOut        DateTime      @map("check_out")
   guestsCount     Int           @map("guests_count")
+  adults          Int           @default(2)
+  children        Int           @default(0)
   status          BookingStatus @default(PENDING)
   customerNotes   String?       @map("customer_notes")
   adminNotes      String?       @map("admin_notes")
@@ -121,10 +125,24 @@ model Booking {
   customer      Customer       @relation(fields: [customerId], references: [id])
   compound      Compound       @relation(fields: [compoundId], references: [id])
   createdByUser User           @relation("CreatedByUser", fields: [createdByUserId], references: [id])
+  bookingRooms  BookingRoom[]
   contracts     Contract[]
   notifications Notification[]
 
   @@map("bookings")
+}
+
+model BookingRoom {
+  id        String   @id @default(uuid())
+  bookingId String   @map("booking_id")
+  roomId    String   @map("room_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  room    Room    @relation(fields: [roomId], references: [id])
+
+  @@unique([bookingId, roomId])
+  @@map("booking_rooms")
 }
 
 model AvailabilityBlock {
@@ -209,6 +227,7 @@ model AuditLog {
 enum Role {
   ADMIN
   OWNER
+  GUEST
 }
 
 enum CompoundStatus {

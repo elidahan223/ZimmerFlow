@@ -33,8 +33,7 @@ function verifyToken(token) {
   });
 }
 
-// Middleware: requires valid Cognito token + loads DB user
-function requireOwner(req, res, next) {
+function loadUserFromToken(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'נדרשת התחברות' });
@@ -52,10 +51,13 @@ function requireOwner(req, res, next) {
       req.user = {
         id: dbUser.id,
         sub: decoded.sub,
-        email: decoded.email,
+        email: decoded.email || dbUser.email,
         role: dbUser.role,
         firstName: dbUser.firstName,
         lastName: dbUser.lastName,
+        phone: dbUser.phone,
+        idNumber: dbUser.idNumber,
+        address: dbUser.address,
       };
       next();
     })
@@ -64,4 +66,20 @@ function requireOwner(req, res, next) {
     });
 }
 
-module.exports = { requireOwner };
+// Any authenticated user (including GUEST)
+function requireAuth(req, res, next) {
+  loadUserFromToken(req, res, next);
+}
+
+// Only ADMIN or OWNER
+function requireOwner(req, res, next) {
+  loadUserFromToken(req, res, (err) => {
+    if (err) return next(err);
+    if (req.user && (req.user.role === 'ADMIN' || req.user.role === 'OWNER')) {
+      return next();
+    }
+    return res.status(403).json({ error: 'נדרשות הרשאות מנהל' });
+  });
+}
+
+module.exports = { requireAuth, requireOwner };
