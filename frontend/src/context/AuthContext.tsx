@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
+import type { ReactNode } from 'react'
 
 interface User {
   userId: string
@@ -12,15 +13,31 @@ interface User {
   phone?: string
 }
 
+export type Role = 'ADMIN' | 'OWNER' | 'GUEST'
+
+export interface Profile {
+  id: string
+  firstName?: string
+  lastName?: string
+  email?: string | null
+  phone?: string
+  idNumber?: string | null
+  address?: string | null
+  role: Role
+}
+
 interface AuthContextType {
   user: User | null
+  profile: Profile | null
   isAuthenticated: boolean
+  isOwner: boolean
   isLoading: boolean
   login: (phone: string, password: string) => Promise<void>
   signup: (data: SignupData) => Promise<{ needsConfirmation: boolean; phone: string }>
   confirmCode: (phone: string, code: string) => Promise<void>
   logout: () => void
   getValidToken: () => Promise<string>
+  refreshProfile: () => Promise<void>
   showAuth: 'login' | 'signup' | 'confirm' | null
   setShowAuth: (v: 'login' | 'signup' | 'confirm' | null) => void
   pendingPhone: string
@@ -47,6 +64,7 @@ export function useAuth() {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [showAuth, setShowAuth] = useState<'login' | 'signup' | 'confirm' | null>(null)
   const [pendingPhone, setPendingPhone] = useState('')
@@ -62,6 +80,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setIsLoading(false)
   }, [])
+
+  // Load profile (with role) whenever we have a user
+  useEffect(() => {
+    if (!user?.accessToken) {
+      setProfile(null)
+      return
+    }
+    fetchProfile()
+  }, [user?.accessToken])
+
+  async function fetchProfile() {
+    try {
+      const token = await getValidToken()
+      if (!token) return
+      const res = await fetch('/api/users/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        setProfile(await res.json())
+      }
+    } catch {}
+  }
 
   const login = async (phone: string, password: string) => {
     const res = await fetch('/api/auth/login', {
@@ -153,19 +193,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     setUser(null)
+    setProfile(null)
     localStorage.removeItem('zimmerflow_auth')
   }
+
+  const isOwner = profile?.role === 'OWNER' || profile?.role === 'ADMIN'
 
   return (
     <AuthContext.Provider value={{
       user,
+      profile,
       isAuthenticated: !!user,
+      isOwner,
       isLoading,
       login,
       signup,
       confirmCode,
       logout,
       getValidToken,
+      refreshProfile: fetchProfile,
       showAuth,
       setShowAuth,
       pendingPhone,

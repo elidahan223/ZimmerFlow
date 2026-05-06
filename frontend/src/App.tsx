@@ -4,10 +4,12 @@ import Navbar from './components/Navbar'
 import Gallery from './components/Gallery'
 import Calendar from './components/Calendar'
 import Settings from './components/Settings'
+import Notifications from './components/Notifications'
+import MyBookings from './components/MyBookings'
 import BottomNav from './components/BottomNav'
 import AuthModal from './components/AuthModal'
 
-export type View = 'gallery' | 'calendar' | 'settings'
+export type View = 'gallery' | 'calendar' | 'settings' | 'notifications' | 'my-bookings'
 
 export interface CompoundTab {
   id: string
@@ -50,12 +52,15 @@ function App() {
     }
   }, [])
 
-  // Reset to gallery if logged out while on settings
+  // Gate admin-only views
   useEffect(() => {
-    if (!auth.isAuthenticated && view === 'settings') {
+    if ((view === 'settings' || view === 'notifications') && !auth.isOwner) {
       setView('gallery')
     }
-  }, [auth.isAuthenticated, view])
+    if (view === 'my-bookings' && !auth.isAuthenticated) {
+      setView('gallery')
+    }
+  }, [auth.isOwner, auth.isAuthenticated, view])
 
   function handleSelectCompound(id: string) {
     setSelectedCompoundId(id)
@@ -70,7 +75,9 @@ function App() {
       <main style={{ paddingTop: 80 }} className="pb-20 sm:pb-6">
         {view === 'gallery' && <Gallery compoundId={selectedCompoundId} />}
         {view === 'calendar' && <Calendar />}
-        {view === 'settings' && auth.isAuthenticated && <Settings />}
+        {view === 'settings' && auth.isOwner && <Settings />}
+        {view === 'notifications' && auth.isOwner && <Notifications />}
+        {view === 'my-bookings' && auth.isAuthenticated && <MyBookings />}
       </main>
       <BottomNav
         view={view}

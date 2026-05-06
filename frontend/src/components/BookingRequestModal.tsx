@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { X, ArrowRight, ArrowLeft, Check, Phone, Loader2 } from 'lucide-react'
+import { X, ArrowRight, ArrowLeft, Check, Phone, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import SignaturePad from './SignaturePad'
 import type { SignaturePadHandle } from './SignaturePad'
@@ -46,7 +46,9 @@ export default function BookingRequestModal({ onClose, onSubmitted }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [bookingId, setBookingId] = useState('')
 
-  const [compoundId, setCompoundId] = useState('')
+  const [selectedCompoundIds, setSelectedCompoundIds] = useState<string[]>([])
+  const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([])
+  const [expandedCompound, setExpandedCompound] = useState<string | null>(null)
   const [checkIn, setCheckIn] = useState('')
   const [checkOut, setCheckOut] = useState('')
   const [adults, setAdults] = useState(2)
@@ -72,7 +74,6 @@ export default function BookingRequestModal({ onClose, onSubmitted }: Props) {
         if (compRes.ok) {
           const data = await compRes.json()
           setCompounds(data)
-          if (data.length > 0) setCompoundId(data[0].id)
         }
       } catch {
         setError('שגיאה בטעינת נתונים')
@@ -81,7 +82,37 @@ export default function BookingRequestModal({ onClose, onSubmitted }: Props) {
     load()
   }, [])
 
-  const compound = compounds.find((c) => c.id === compoundId)
+  function toggleCompound(compoundId: string) {
+    const c = compounds.find((x) => x.id === compoundId)
+    if (!c) return
+    const compoundRoomIds = c.rooms.map((r) => r.id)
+    if (selectedCompoundIds.includes(compoundId)) {
+      setSelectedCompoundIds((prev) => prev.filter((id) => id !== compoundId))
+      setSelectedRoomIds((prev) => prev.filter((id) => !compoundRoomIds.includes(id)))
+    } else {
+      setSelectedCompoundIds((prev) => [...prev, compoundId])
+      setSelectedRoomIds((prev) => [...prev, ...compoundRoomIds.filter((id) => !prev.includes(id))])
+    }
+  }
+
+  function toggleRoom(roomId: string, compoundId: string) {
+    const c = compounds.find((x) => x.id === compoundId)
+    if (!c) return
+    const compoundRoomIds = c.rooms.map((r) => r.id)
+    if (selectedRoomIds.includes(roomId)) {
+      const remaining = selectedRoomIds.filter((id) => id !== roomId)
+      setSelectedRoomIds(remaining)
+      // If no rooms of this compound remain, deselect the compound
+      if (!remaining.some((id) => compoundRoomIds.includes(id))) {
+        setSelectedCompoundIds((prev) => prev.filter((id) => id !== compoundId))
+      }
+    } else {
+      setSelectedRoomIds((prev) => [...prev, roomId])
+      if (!selectedCompoundIds.includes(compoundId)) {
+        setSelectedCompoundIds((prev) => [...prev, compoundId])
+      }
+    }
+  }
 
   const nights = useMemo(() => {
     if (!checkIn || !checkOut) return 0
@@ -90,30 +121,64 @@ export default function BookingRequestModal({ onClose, onSubmitted }: Props) {
   }, [checkIn, checkOut])
 
   const totalPrice = useMemo(() => {
-    if (!compound || nights <= 0) return null
-    const wd = parseFloat(String(compound.weekdayPrice || 0))
-    const we = parseFloat(String(compound.weekendPrice || 0))
-    if (!wd && !we) return null
-    let total = 0
-    const start = new Date(checkIn)
-    for (let i = 0; i < nights; i++) {
-      const d = new Date(start)
-      d.setDate(start.getDate() + i)
-      const dow = d.getDay()
-      total += dow === 5 || dow === 6 ? we : wd
+    if (selectedCompoundIds.length === 0 || nights <= 0) return null
+    let grand = 0
+    let priced = false
+    for (const cid of selectedCompoundIds) {
+      const c = compounds.find((x) => x.id === cid)
+      if (!c) continue
+      const wd = parseFloat(String(c.weekdayPrice || 0))
+      const we = parseFloat(String(c.weekendPrice || 0))
+      if (!wd && !we) continue
+      priced = true
+      const start = new Date(checkIn)
+      for (let i = 0; i < nights; i++) {
+        const d = new Date(start)
+        d.setDate(start.getDate() + i)
+        const dow = d.getDay()
+        grand += dow === 5 || dow === 6 ? we : wd
+      }
     }
-    return Math.round(total)
-  }, [compound, nights, checkIn])
+    return priced ? Math.round(grand) : null
+  }, [selectedCompoundIds, compounds, nights, checkIn])
 
   const fullName = `${profile?.firstName || ''} ${profile?.lastName || ''}`.trim()
   const todayStr = new Date().toISOString().slice(0, 10)
+
+  // Build per-compound roomIds map (compoundId -> selected rooms in it). Empty = whole compound.
+  const compoundRoomsMap = useMemo(() => {
+    const map = new Map<string, string[]>()
+    for (const cid of selectedCompoundIds) {
+      const c = compounds.find((x) => x.id === cid)
+      if (!c) continue
+      const compoundRoomIds = c.rooms.map((r) => r.id)
+      const picked = selectedRoomIds.filter((id) => compoundRoomIds.includes(id))
+      // If all rooms picked OR no rooms exist on compound — book whole compound (empty array)
+      const isWhole = c.rooms.length === 0 || picked.length === c.rooms.length
+      map.set(cid, isWhole ? [] : picked)
+    }
+    return map
+  }, [selectedCompoundIds, selectedRoomIds, compounds])
+
+  const bookingItems = useMemo(() => {
+    return selectedCompoundIds.map((cid) => {
+      const c = compounds.find((x) => x.id === cid)
+      if (!c) return { compoundName: '?', roomsLabel: '?' }
+      const picked = compoundRoomsMap.get(cid) || []
+      const isWhole = picked.length === 0
+      const roomsLabel = isWhole
+        ? 'כל המתחם'
+        : 'חדרים: ' + picked.map((rid) => c.rooms.find((r) => r.id === rid)?.name || '').filter(Boolean).join(', ')
+      return { compoundName: c.name, roomsLabel }
+    })
+  }, [selectedCompoundIds, compoundRoomsMap, compounds])
 
   const contractData: ContractData = {
     customerName: fullName,
     customerIdNumber: profile?.idNumber || '',
     customerPhone: profile?.phone || '',
     customerAddress: profile?.address || '',
-    compoundName: compound?.name || '',
+    bookingItems,
     checkIn,
     checkOut,
     checkInTime,
@@ -127,7 +192,8 @@ export default function BookingRequestModal({ onClose, onSubmitted }: Props) {
   }
 
   function canProceedStep1() {
-    if (!compoundId || !checkIn || !checkOut) return false
+    if (selectedCompoundIds.length === 0) return false
+    if (!checkIn || !checkOut) return false
     if (nights <= 0) return false
     if (new Date(checkIn) < new Date(todayStr)) return false
     return true
@@ -148,80 +214,35 @@ export default function BookingRequestModal({ onClose, onSubmitted }: Props) {
     try {
       const sig = sigRef.current.toDataURL()
       setSignatureDataUrl(sig)
-      await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
-
-      const html2canvas = (await import('html2canvas')).default
-      const { jsPDF } = await import('jspdf')
-
-      if (!contractRef.current) throw new Error('לא ניתן לייצר את החוזה')
-      const canvas = await html2canvas(contractRef.current, {
-        scale: 2,
-        backgroundColor: '#ffffff',
-        useCORS: true,
-        logging: false,
-      })
-      const imgData = canvas.toDataURL('image/jpeg', 0.92)
-
-      const pdf = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' })
-      const pdfW = pdf.internal.pageSize.getWidth()
-      const pdfH = pdf.internal.pageSize.getHeight()
-      const ratio = canvas.height / canvas.width
-      const imgH = pdfW * ratio
-      if (imgH <= pdfH) {
-        pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, imgH)
-      } else {
-        let heightLeft = imgH
-        let position = 0
-        pdf.addImage(imgData, 'JPEG', 0, position, pdfW, imgH)
-        heightLeft -= pdfH
-        while (heightLeft > 0) {
-          position = heightLeft - imgH
-          pdf.addPage()
-          pdf.addImage(imgData, 'JPEG', 0, position, pdfW, imgH)
-          heightLeft -= pdfH
-        }
-      }
-      const pdfBlob = pdf.output('blob')
 
       const token = await auth.getValidToken()
-      const presignRes = await fetch('/api/images/presign-contract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      })
-      if (!presignRes.ok) throw new Error('שגיאה בקבלת כתובת העלאה')
-      const { uploadUrl, key } = await presignRes.json()
+      const compoundsPayload = selectedCompoundIds.map((cid) => ({
+        compoundId: cid,
+        roomIds: compoundRoomsMap.get(cid) || [],
+      }))
 
-      const uploadRes = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/pdf' },
-        body: pdfBlob,
-      })
-      if (!uploadRes.ok) throw new Error('שגיאה בהעלאת חוזה')
-
-      const bookingRes = await fetch('/api/bookings/request', {
+      const res = await fetch('/api/bookings/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          compoundId,
+          compounds: compoundsPayload,
           checkIn,
           checkOut,
-          guestsCount: adults + children,
+          checkInTime,
+          checkOutTime,
           adults,
           children,
+          guestsCount: adults + children,
           customerNotes: notes || undefined,
-          contractKey: key,
-          signatureMetadata: {
-            signedAt: new Date().toISOString(),
-            checkInTime,
-            checkOutTime,
-            totalPrice,
-          },
+          signatureBase64: sig,
+          totalPrice,
         }),
       })
-      const bookingData = await bookingRes.json()
-      if (!bookingRes.ok) throw new Error(bookingData.error || 'שגיאה בשליחת בקשה')
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'שגיאה בשליחת בקשה')
 
-      setBookingId(bookingData.booking?.id || '')
+      const firstId = data.bookings?.[0]?.id || ''
+      setBookingId(firstId)
       setStep(3)
     } catch (e: any) {
       setError(e?.message || 'שגיאה בעיבוד הבקשה')
@@ -255,14 +276,83 @@ export default function BookingRequestModal({ onClose, onSubmitted }: Props) {
           {step === 1 && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1.5">בחירת מתחם</label>
-                <select value={compoundId} onChange={(e) => setCompoundId(e.target.value)} className={inputClass}>
-                  {compounds.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} (עד {c.capacity} אורחים)
-                    </option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium text-neutral-700 mb-1.5">מתחמים וחדרים</label>
+                <div className="space-y-1.5">
+                  {compounds.map((c) => {
+                    const isSelected = selectedCompoundIds.includes(c.id)
+                    const isExpanded = expandedCompound === c.id
+                    const compoundRoomIds = c.rooms.map((r) => r.id)
+                    const selectedCount = selectedRoomIds.filter((id) => compoundRoomIds.includes(id)).length
+                    const allRoomsSelected = c.rooms.length > 0 && selectedCount === c.rooms.length
+                    return (
+                      <div key={c.id}>
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => toggleCompound(c.id)}
+                            className={`flex-1 flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm transition-all ${
+                              isSelected
+                                ? 'border-neutral-900 bg-neutral-900 text-white'
+                                : 'border-neutral-200 bg-neutral-50 text-neutral-700 hover:border-neutral-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{c.name}</span>
+                              {c.rooms.length > 0 && selectedCount > 0 && !allRoomsSelected && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-white/20' : 'bg-neutral-200'}`}>
+                                  {selectedCount}/{c.rooms.length}
+                                </span>
+                              )}
+                            </div>
+                            {isSelected && <Check className="w-4 h-4 shrink-0" />}
+                          </button>
+                          {c.rooms.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedCompound(isExpanded ? null : c.id)}
+                              className="flex items-center justify-center w-10 rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-400 hover:border-neutral-300 hover:text-neutral-600 transition-all"
+                            >
+                              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            </button>
+                          )}
+                        </div>
+
+                        {isExpanded && c.rooms.length > 0 && (
+                          <div className="grid grid-cols-2 gap-1.5 mt-1.5 mr-4">
+                            {c.rooms.map((r) => {
+                              const roomSelected = selectedRoomIds.includes(r.id)
+                              return (
+                                <button
+                                  key={r.id}
+                                  type="button"
+                                  onClick={() => toggleRoom(r.id, c.id)}
+                                  className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-all ${
+                                    roomSelected
+                                      ? 'border-neutral-700 bg-neutral-700 text-white'
+                                      : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300'
+                                  }`}
+                                >
+                                  <div className="text-right">
+                                    <div className="font-medium text-xs">{r.name}</div>
+                                    {r.capacity != null && (
+                                      <div className={`text-[10px] ${roomSelected ? 'text-neutral-300' : 'text-neutral-400'}`}>
+                                        עד {r.capacity}
+                                      </div>
+                                    )}
+                                  </div>
+                                  {roomSelected && <Check className="w-3.5 h-3.5 shrink-0" />}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="text-xs text-neutral-400 mt-1.5">
+                  לחץ על מתחם להזמנה מלאה, או הרחב ובחר חדרים ספציפיים. ניתן לבחור יותר ממתחם אחד.
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

@@ -33,8 +33,24 @@ async function getContractUploadUrl({ fileExtension = 'pdf', contentType = 'appl
   return { uploadUrl, key };
 }
 
-async function getContractDownloadUrl(key, expiresIn = 600) {
-  const command = new GetObjectCommand({ Bucket: CONTRACTS_BUCKET, Key: key });
+// Direct server-side upload of a contract PDF buffer
+async function uploadContractBuffer(buffer, { fileExtension = 'pdf', contentType = 'application/pdf' } = {}) {
+  const key = `contracts/${crypto.randomUUID()}.${fileExtension}`;
+  await s3.send(new PutObjectCommand({
+    Bucket: CONTRACTS_BUCKET,
+    Key: key,
+    Body: buffer,
+    ContentType: contentType,
+  }));
+  return key;
+}
+
+async function getContractDownloadUrl(key, expiresIn = 600, downloadFilename = null) {
+  const params = { Bucket: CONTRACTS_BUCKET, Key: key };
+  if (downloadFilename) {
+    params.ResponseContentDisposition = `attachment; filename="${downloadFilename}"`;
+  }
+  const command = new GetObjectCommand(params);
   return getSignedUrl(s3, command, { expiresIn });
 }
 
@@ -60,6 +76,7 @@ async function deleteObject(publicUrl) {
 module.exports = {
   getImageUploadUrl,
   getContractUploadUrl,
+  uploadContractBuffer,
   getContractDownloadUrl,
   deleteImage,
   deleteContract,

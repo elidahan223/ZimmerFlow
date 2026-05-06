@@ -2,11 +2,14 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../config/database');
 const { requireOwner, requireAuth } = require('../middleware/auth');
+const { deleteContract } = require('../services/s3');
+const { generateContractPdf } = require('../services/contractPdfService');
 
 const bookingInclude = {
   customer: true,
   compound: true,
   bookingRooms: { include: { room: true } },
+  contracts: { select: { id: true, contractNumber: true, status: true, signedAt: true } },
 };
 
 // PUBLIC - זמינות (רק תאריכים, בלי פרטי לקוח)
@@ -52,6 +55,34 @@ router.get('/', requireOwner, async (req, res, next) => {
   }
 });
 
+// AUTH - ההזמנות של המשתמש המחובר (כל סטטוס)
+router.get('/mine', requireAuth, async (req, res, next) => {
+  try {
+    const bookings = await prisma.booking.findMany({
+      where: { createdByUserId: req.user.id },
+      include: { ...bookingInclude, contracts: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(bookings);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// OWNER - הזמנות ממתינות לאישור (לטאב התראות)
+router.get('/pending', requireOwner, async (req, res, next) => {
+  try {
+    const bookings = await prisma.booking.findMany({
+      where: { status: 'PENDING' },
+      include: { ...bookingInclude, contracts: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(bookings);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // OWNER - הזמנה בודדת
 router.get('/:id', requireOwner, async (req, res, next) => {
   try {
@@ -66,46 +97,83 @@ router.get('/:id', requireOwner, async (req, res, next) => {
   }
 });
 
-// AUTH - בקשת הזמנה ע"י משתמש רגיל (GUEST), חתום עם חוזה
+// AUTH - בקשת הזמנה ע"י משתמש מחובר (תומך מרובה מתחמים, מייצר PDF חתום בשרת)
 router.post('/request', requireAuth, async (req, res, next) => {
   try {
-    const { compoundId, roomIds, checkIn, checkOut, guestsCount, adults, children, customerNotes, contractKey, signatureMetadata } = req.body;
+    const {
+      compounds: compoundsInput,
+      checkIn, checkOut,
+      checkInTime, checkOutTime,
+      adults, children, guestsCount,
+      customerNotes,
+      signatureBase64,
+      totalPrice,
+    } = req.body;
 
-    if (!compoundId || !checkIn || !checkOut) {
-      return res.status(400).json({ error: 'חסרים שדות חובה: מתחם, צ׳ק-אין, צ׳ק-אאוט' });
+    if (!Array.isArray(compoundsInput) || compoundsInput.length === 0) {
+      return res.status(400).json({ error: 'יש לבחור לפחות מתחם אחד' });
     }
-    if (!contractKey) {
-      return res.status(400).json({ error: 'נדרש לחתום על החוזה לפני שליחת הבקשה' });
+    if (!checkIn || !checkOut) {
+      return res.status(400).json({ error: 'חסרים תאריכי צ׳ק-אין/צ׳ק-אאוט' });
+    }
+    if (!signatureBase64 || !signatureBase64.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'נדרשת חתימה תקינה' });
     }
 
-    // Overlap check (room-level if rooms picked, else compound-level)
-    if (roomIds && roomIds.length > 0) {
-      const overlap = await prisma.bookingRoom.findFirst({
-        where: {
-          roomId: { in: roomIds },
-          booking: {
+    // Validate every compound + overlap check, and load names for the contract
+    const compoundDetails = [];
+    for (const item of compoundsInput) {
+      const compoundId = item.compoundId;
+      const roomIds = Array.isArray(item.roomIds) ? item.roomIds : [];
+      if (!compoundId) {
+        return res.status(400).json({ error: 'מתחם לא תקין' });
+      }
+      const compound = await prisma.compound.findUnique({
+        where: { id: compoundId },
+        include: { rooms: true },
+      });
+      if (!compound) {
+        return res.status(404).json({ error: 'מתחם לא נמצא' });
+      }
+
+      if (roomIds.length > 0) {
+        const overlap = await prisma.bookingRoom.findFirst({
+          where: {
+            roomId: { in: roomIds },
+            booking: {
+              status: { in: ['PENDING', 'CONFIRMED'] },
+              checkIn: { lt: new Date(checkOut) },
+              checkOut: { gt: new Date(checkIn) },
+            },
+          },
+          include: { room: true },
+        });
+        if (overlap) {
+          return res.status(409).json({ error: `חדר "${overlap.room.name}" תפוס בתאריכים המבוקשים` });
+        }
+      } else {
+        const overlap = await prisma.booking.findFirst({
+          where: {
+            compoundId,
             status: { in: ['PENDING', 'CONFIRMED'] },
             checkIn: { lt: new Date(checkOut) },
             checkOut: { gt: new Date(checkIn) },
           },
-        },
-        include: { room: true },
-      });
-      if (overlap) {
-        return res.status(409).json({ error: `חדר "${overlap.room.name}" תפוס בתאריכים המבוקשים` });
+        });
+        if (overlap) {
+          return res.status(409).json({ error: `המתחם "${compound.name}" תפוס בתאריכים המבוקשים` });
+        }
       }
-    } else {
-      const overlap = await prisma.booking.findFirst({
-        where: {
-          compoundId,
-          status: { in: ['PENDING', 'CONFIRMED'] },
-          checkIn: { lt: new Date(checkOut) },
-          checkOut: { gt: new Date(checkIn) },
-        },
+
+      const pickedRoomNames = roomIds
+        .map((rid) => compound.rooms.find((r) => r.id === rid)?.name)
+        .filter(Boolean);
+      compoundDetails.push({
+        compoundId,
+        compoundName: compound.name,
+        roomIds,
+        roomsLabel: roomIds.length === 0 ? 'כל המתחם' : 'חדרים: ' + pickedRoomNames.join(', '),
       });
-      if (overlap) {
-        return res.status(409).json({ error: 'התאריכים המבוקשים תפוסים' });
-      }
     }
 
     // Reuse Customer record per phone (avoid duplicates for repeat guests)
@@ -133,53 +201,94 @@ router.post('/request', requireAuth, async (req, res, next) => {
       });
     }
 
-    const result = await prisma.$transaction(async (tx) => {
-      const booking = await tx.booking.create({
-        data: {
-          customerId: customer.id,
-          compoundId,
-          createdByUserId: req.user.id,
-          checkIn: new Date(checkIn),
-          checkOut: new Date(checkOut),
-          guestsCount: guestsCount || ((adults || 2) + (children || 0)),
-          adults: adults || 2,
-          children: children || 0,
-          status: 'PENDING',
-          customerNotes: customerNotes || null,
-          ...(roomIds && roomIds.length > 0 && {
-            bookingRooms: { create: roomIds.map((roomId) => ({ roomId })) },
-          }),
-        },
-        include: bookingInclude,
-      });
+    // Compute nights from dates
+    const nights = Math.max(0, Math.round(
+      (new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000
+    ));
 
-      const contractNumber = `CTR-${Date.now()}-${booking.id.slice(0, 6)}`;
-      const contract = await tx.contract.create({
-        data: {
-          bookingId: booking.id,
-          contractNumber,
-          templateVersion: 'v1',
-          status: 'SIGNED',
-          fileUrl: contractKey,
-          signedFileUrl: contractKey,
-          signedAt: new Date(),
-        },
-      });
+    // Generate signed PDF on the server
+    const pdfData = {
+      customerName: fullName,
+      customerIdNumber: req.user.idNumber || '',
+      customerPhone: req.user.phone || '',
+      customerAddress: req.user.address || '',
+      bookingItems: compoundDetails.map((c) => ({
+        compoundName: c.compoundName,
+        roomsLabel: c.roomsLabel,
+      })),
+      checkIn,
+      checkOut,
+      checkInTime: checkInTime || '15:00',
+      checkOutTime: checkOutTime || '11:00',
+      nights,
+      adults: adults || 2,
+      children: children || 0,
+      totalPrice: totalPrice ?? null,
+      signatureBase64,
+      signedDate: new Date().toISOString().slice(0, 10),
+    };
 
-      await tx.signatureEvent.create({
-        data: {
-          contractId: contract.id,
-          eventType: 'SIGNED',
-          ipAddress: req.ip || req.headers['x-forwarded-for'] || null,
-          userAgent: req.headers['user-agent'] || null,
-          metadata: signatureMetadata || null,
-        },
-      });
+    let contractKey;
+    try {
+      const result = await generateContractPdf(pdfData);
+      contractKey = result.key;
+    } catch (e) {
+      console.error('PDF generation failed:', e);
+      return res.status(500).json({ error: 'שגיאה ביצירת קובץ החוזה' });
+    }
 
-      return { booking, contract };
+    // Create one booking + contract per compound, all sharing the same contractKey
+    const created = await prisma.$transaction(async (tx) => {
+      const out = [];
+      for (const c of compoundDetails) {
+        const booking = await tx.booking.create({
+          data: {
+            customerId: customer.id,
+            compoundId: c.compoundId,
+            createdByUserId: req.user.id,
+            checkIn: new Date(checkIn),
+            checkOut: new Date(checkOut),
+            guestsCount: guestsCount || ((adults || 2) + (children || 0)),
+            adults: adults || 2,
+            children: children || 0,
+            status: 'PENDING',
+            customerNotes: customerNotes || null,
+            ...(c.roomIds.length > 0 && {
+              bookingRooms: { create: c.roomIds.map((roomId) => ({ roomId })) },
+            }),
+          },
+          include: bookingInclude,
+        });
+
+        const contractNumber = `CTR-${Date.now()}-${booking.id.slice(0, 6)}`;
+        const contract = await tx.contract.create({
+          data: {
+            bookingId: booking.id,
+            contractNumber,
+            templateVersion: 'v2',
+            status: 'SIGNED',
+            fileUrl: contractKey,
+            signedFileUrl: contractKey,
+            signedAt: new Date(),
+          },
+        });
+
+        await tx.signatureEvent.create({
+          data: {
+            contractId: contract.id,
+            eventType: 'SIGNED',
+            ipAddress: req.ip || req.headers['x-forwarded-for'] || null,
+            userAgent: req.headers['user-agent'] || null,
+            metadata: { checkInTime, checkOutTime, totalPrice, signedDate: pdfData.signedDate },
+          },
+        });
+
+        out.push({ booking, contract });
+      }
+      return out;
     });
 
-    res.status(201).json(result);
+    res.status(201).json({ bookings: created.map((c) => c.booking), contractKey });
   } catch (err) {
     next(err);
   }
@@ -369,10 +478,41 @@ router.patch('/:id/status', requireOwner, async (req, res, next) => {
   }
 });
 
-// OWNER - מחיקת הזמנה
+// OWNER - מחיקת הזמנה (כולל ניקוי PDF החוזה אם לא משותף)
 router.delete('/:id', requireOwner, async (req, res, next) => {
   try {
-    await prisma.booking.delete({ where: { id: req.params.id } });
+    // Get contracts attached to this booking before deletion
+    const booking = await prisma.booking.findUnique({
+      where: { id: req.params.id },
+      include: { contracts: true },
+    });
+    if (!booking) return res.status(404).json({ error: 'הזמנה לא נמצאה' });
+
+    const contractKeys = booking.contracts
+      .map((c) => c.signedFileUrl || c.fileUrl)
+      .filter(Boolean);
+
+    // Delete the booking (cascade removes contracts via FK if set, but here we delete contracts manually)
+    await prisma.$transaction([
+      prisma.signatureEvent.deleteMany({
+        where: { contract: { bookingId: req.params.id } },
+      }),
+      prisma.contract.deleteMany({ where: { bookingId: req.params.id } }),
+      prisma.bookingRoom.deleteMany({ where: { bookingId: req.params.id } }),
+      prisma.notification.deleteMany({ where: { bookingId: req.params.id } }),
+      prisma.booking.delete({ where: { id: req.params.id } }),
+    ]);
+
+    // For each contract key, only delete from S3 if no other contract still references it
+    for (const key of contractKeys) {
+      const stillReferenced = await prisma.contract.findFirst({
+        where: { OR: [{ fileUrl: key }, { signedFileUrl: key }] },
+      });
+      if (!stillReferenced) {
+        await deleteContract(key).catch(() => {});
+      }
+    }
+
     res.json({ message: 'ההזמנה נמחקה' });
   } catch (err) {
     next(err);

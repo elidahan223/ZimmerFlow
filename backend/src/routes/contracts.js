@@ -21,7 +21,9 @@ router.get('/:id/download', requireAuth, async (req, res, next) => {
       return res.status(403).json({ error: 'אין הרשאה לצפות בחוזה זה' });
     }
 
-    const url = await getContractDownloadUrl(contract.signedFileUrl, 600);
+    const downloadMode = req.query.download === '1';
+    const filename = downloadMode ? `contract-${contract.contractNumber}.pdf` : null;
+    const url = await getContractDownloadUrl(contract.signedFileUrl, 600, filename);
     res.json({ url, expiresIn: 600 });
   } catch (err) {
     next(err);

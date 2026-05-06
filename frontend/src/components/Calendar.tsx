@@ -17,7 +17,7 @@ const COMPOUND_BG_STRONG = ['#93c5fd', '#86efac', '#fcd34d', '#fca5a5', '#c4b5fd
 
 interface Room { id: string; name: string; capacity: number | null }
 interface Cabin { id: string; name: string; color: string; bg: string; bgStrong: string; rooms: Room[] }
-interface Booking { id: string; compoundId: string; checkIn: string; checkOut: string; guestName?: string; phone?: string; email?: string; idNumber?: string; status: string }
+interface Booking { id: string; compoundId: string; checkIn: string; checkOut: string; guestName?: string; phone?: string; email?: string; idNumber?: string; status: string; contractId?: string | null }
 
 function toDateStr(d: string | Date) {
   const date = new Date(d)
@@ -37,10 +37,10 @@ export default function Calendar() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [showBookingForm, setShowBookingForm] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
-  const [role, setRole] = useState<'ADMIN' | 'OWNER' | 'GUEST' | null>(null)
 
   const fetched = useRef(false)
-  const isOwner = role === 'ADMIN' || role === 'OWNER'
+  const isOwner = auth.isOwner
+  const role = auth.profile?.role || null
 
   // Fetch data once
   useEffect(() => {
@@ -65,21 +65,12 @@ export default function Calendar() {
   async function loadBookings() {
     let url = '/api/bookings/availability'
     const headers: Record<string, string> = {}
-    let userRole: 'ADMIN' | 'OWNER' | 'GUEST' | null = null
 
     if (auth.isAuthenticated) {
       const token = await auth.getValidToken()
       if (token) {
         headers['Authorization'] = `Bearer ${token}`
-        try {
-          const meRes = await fetch('/api/users/me', { headers })
-          if (meRes.ok) {
-            const me = await meRes.json()
-            userRole = me.role || 'GUEST'
-            setRole(userRole)
-          }
-        } catch {}
-        if (userRole === 'ADMIN' || userRole === 'OWNER') {
+        if (auth.isOwner) {
           url = '/api/bookings'
         }
       }
@@ -95,6 +86,7 @@ export default function Calendar() {
         email: b.customer?.email || '',
         idNumber: b.customer?.idNumber || '',
         status: b.status,
+        contractId: b.contracts?.[0]?.id || null,
       }))))
       .catch(() => {})
   }
@@ -391,6 +383,27 @@ export default function Calendar() {
 
                     {auth.isAuthenticated && (
                       <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-neutral-100">
+                        {isOwner && b.contractId && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                const token = await auth.getValidToken()
+                                const res = await fetch(`/api/contracts/${b.contractId}/download`, {
+                                  headers: { Authorization: `Bearer ${token}` },
+                                })
+                                if (!res.ok) throw new Error('שגיאה בפתיחת חוזה')
+                                const { url } = await res.json()
+                                window.open(url, '_blank', 'noopener,noreferrer')
+                              } catch (e: any) {
+                                alert(e?.message || 'שגיאה')
+                              }
+                            }}
+                            className="flex items-center gap-1 text-[11px] font-medium px-2.5 py-1.5 rounded-lg bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            חוזה
+                          </button>
+                        )}
                         {b.status === 'PENDING' && (
                           <button
                             onClick={() => updateBookingStatus(b.id, 'CONFIRMED')}

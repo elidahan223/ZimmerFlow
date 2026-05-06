@@ -13,17 +13,20 @@ export default function Navbar() {
 
         <div className="flex items-center gap-3">
           <a
-            href="tel:054-123-4567"
+            href="tel:0546688566"
             className="hidden sm:block text-sm text-neutral-400 hover:text-neutral-700 transition-colors"
+            dir="ltr"
           >
-            054-123-4567
+            054-668-8566
           </a>
 
           {auth.isAuthenticated ? (
             <div className="flex items-center gap-2">
               <span className="hidden sm:flex items-center gap-1.5 text-sm text-neutral-600">
                 <User className="w-4 h-4" />
-                מנהל
+                {auth.profile?.firstName
+                  ? `${auth.isOwner ? 'מנהל: ' : ''}${auth.profile.firstName}`
+                  : auth.isOwner ? 'מנהל' : 'אורח'}
               </span>
               <button
                 onClick={auth.logout}
