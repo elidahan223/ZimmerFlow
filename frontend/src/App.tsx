@@ -8,6 +8,7 @@ import Notifications from './components/Notifications'
 import MyBookings from './components/MyBookings'
 import BottomNav from './components/BottomNav'
 import AuthModal from './components/AuthModal'
+import AgentChat from './components/AgentChat'
 
 export type View = 'gallery' | 'calendar' | 'settings' | 'notifications' | 'my-bookings'
 
@@ -87,6 +88,12 @@ function App() {
         onSelectCompound={handleSelectCompound}
       />
       <AuthModal />
+      {view === 'gallery' && selectedCompoundId && !auth.isOwner && (
+        <AgentChat
+          compoundId={selectedCompoundId}
+          compoundName={compounds.find((c) => c.id === selectedCompoundId)?.name}
+        />
+      )}
     </div>
   )
 }

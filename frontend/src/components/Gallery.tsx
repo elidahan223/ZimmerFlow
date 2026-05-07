@@ -118,29 +118,36 @@ export default function Gallery({ compoundId }: Props) {
           </div>
         </div>
 
-        {/* Yard images */}
+        {/* Yard images - horizontal swipe carousel */}
         {yardImages.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2 rounded-xl overflow-hidden">
-            {yardImages.slice(0, 5).map((img, imgIdx) => (
-              <div
-                key={img.id}
-                onClick={() => setLightbox(imgIdx)}
-                className={`cursor-pointer overflow-hidden ${
-                  imgIdx === 0 ? 'col-span-2 sm:col-span-2 sm:row-span-2' : ''
-                }`}
-              >
-                <img
-                  src={img.url}
-                  alt={`${compound.name} ${imgIdx + 1}`}
-                  className={`w-full object-cover hover:scale-[1.03] transition-transform duration-500 ease-out ${
-                    imgIdx === 0
-                      ? 'h-48 sm:h-[400px] lg:h-[480px]'
-                      : 'h-32 sm:h-[196px] lg:h-[236px]'
-                  }`}
-                  loading="lazy"
-                />
-              </div>
-            ))}
+          <div className="relative">
+            <div
+              className="flex gap-2 overflow-x-auto snap-x snap-mandatory pb-2 -mx-3 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8"
+              style={{ scrollbarWidth: 'thin' }}
+            >
+              {yardImages.map((img, imgIdx) => (
+                <div
+                  key={img.id}
+                  onClick={() => setLightbox(imgIdx)}
+                  className="cursor-pointer overflow-hidden rounded-xl flex-shrink-0 snap-start"
+                  style={{
+                    width: 'min(85vw, 720px)',
+                    maxWidth: '720px',
+                  }}
+                >
+                  <img
+                    src={img.url}
+                    alt={`${compound.name} ${imgIdx + 1}`}
+                    className="w-full h-56 sm:h-[420px] lg:h-[480px] object-cover hover:scale-[1.02] transition-transform duration-500 ease-out"
+                    loading="lazy"
+                  />
+                </div>
+              ))}
+            </div>
+            {/* Counter badge */}
+            <div className="absolute bottom-4 left-4 bg-black/60 text-white text-xs font-medium px-3 py-1.5 rounded-full pointer-events-none">
+              {yardImages.length} תמונות · החלק לצדדים
+            </div>
           </div>
         )}
 
@@ -168,21 +175,28 @@ export default function Gallery({ compoundId }: Props) {
                   )}
                 </h3>
 
-                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 snap-x snap-mandatory" dir="rtl">
-                  {(room.images || []).map((img, imgIdx) => (
-                    <div
-                      key={img.id}
-                      onClick={() => setLightbox(roomStartIdx + imgIdx)}
-                      className="cursor-pointer overflow-hidden rounded-xl shrink-0 snap-start w-64 sm:w-72 lg:w-80"
-                    >
-                      <img
-                        src={img.url}
-                        alt={`${room.name} ${imgIdx + 1}`}
-                        className="w-full h-44 sm:h-52 lg:h-56 object-cover hover:scale-[1.03] transition-transform duration-500 ease-out"
-                        loading="lazy"
-                      />
+                <div className="relative">
+                  <div className="flex gap-2 overflow-x-auto pb-2 snap-x snap-mandatory" dir="rtl" style={{ scrollbarWidth: 'thin' }}>
+                    {(room.images || []).map((img, imgIdx) => (
+                      <div
+                        key={img.id}
+                        onClick={() => setLightbox(roomStartIdx + imgIdx)}
+                        className="cursor-pointer overflow-hidden rounded-xl shrink-0 snap-start w-64 sm:w-72 lg:w-80"
+                      >
+                        <img
+                          src={img.url}
+                          alt={`${room.name} ${imgIdx + 1}`}
+                          className="w-full h-44 sm:h-52 lg:h-56 object-cover hover:scale-[1.03] transition-transform duration-500 ease-out"
+                          loading="lazy"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  {(room.images || []).length > 1 && (
+                    <div className="absolute bottom-4 left-4 bg-black/60 text-white text-xs font-medium px-3 py-1.5 rounded-full pointer-events-none">
+                      {(room.images || []).length} תמונות · החלק לצדדים
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             )

@@ -13,6 +13,7 @@ const userRoutes = require('./routes/users');
 const authRoutes = require('./routes/auth');
 const imageRoutes = require('./routes/images');
 const contractRoutes = require('./routes/contracts');
+const agentRoutes = require('./routes/agent');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -39,6 +40,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/images', imageRoutes);
 app.use('/api/contracts', contractRoutes);
+app.use('/api/agent', agentRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

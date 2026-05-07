@@ -32,12 +32,23 @@ interface UserProfile {
   address?: string
 }
 
+export interface BookingInitialValues {
+  compoundIds?: string[]
+  roomIds?: string[]
+  checkIn?: string
+  checkOut?: string
+  adults?: number
+  children?: number
+  notes?: string
+}
+
 interface Props {
   onClose: () => void
   onSubmitted: () => void
+  initialValues?: BookingInitialValues
 }
 
-export default function BookingRequestModal({ onClose, onSubmitted }: Props) {
+export default function BookingRequestModal({ onClose, onSubmitted, initialValues }: Props) {
   const auth = useAuth()
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -46,16 +57,16 @@ export default function BookingRequestModal({ onClose, onSubmitted }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [bookingId, setBookingId] = useState('')
 
-  const [selectedCompoundIds, setSelectedCompoundIds] = useState<string[]>([])
-  const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([])
+  const [selectedCompoundIds, setSelectedCompoundIds] = useState<string[]>(initialValues?.compoundIds || [])
+  const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>(initialValues?.roomIds || [])
   const [expandedCompound, setExpandedCompound] = useState<string | null>(null)
-  const [checkIn, setCheckIn] = useState('')
-  const [checkOut, setCheckOut] = useState('')
-  const [adults, setAdults] = useState(2)
-  const [children, setChildren] = useState(0)
+  const [checkIn, setCheckIn] = useState(initialValues?.checkIn || '')
+  const [checkOut, setCheckOut] = useState(initialValues?.checkOut || '')
+  const [adults, setAdults] = useState(initialValues?.adults ?? 2)
+  const [children, setChildren] = useState(initialValues?.children ?? 0)
   const [checkInTime, setCheckInTime] = useState('15:00')
   const [checkOutTime, setCheckOutTime] = useState('11:00')
-  const [notes, setNotes] = useState('')
+  const [notes, setNotes] = useState(initialValues?.notes || '')
 
   const [agreed, setAgreed] = useState(false)
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null)

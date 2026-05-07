@@ -349,7 +349,7 @@ export default function CompoundForm({ compound, onClose, onSaved }: Props) {
                 onAddFiles={handleYardAddFiles}
                 onRemoveExisting={handleYardRemoveExisting}
                 onRemovePending={handleYardRemovePending}
-                maxImages={10}
+                maxImages={30}
               />
 
               {/* תפוסה + סטטוס */}
@@ -506,7 +506,7 @@ export default function CompoundForm({ compound, onClose, onSaved }: Props) {
                             onAddFiles={(files) => handleRoomAddFiles(index, files)}
                             onRemoveExisting={(id) => handleRoomRemoveExisting(index, id)}
                             onRemovePending={(fi) => handleRoomRemovePending(index, fi)}
-                            maxImages={8}
+                            maxImages={20}
                           />
                         </div>
                       )}
@@ -557,7 +557,7 @@ export default function CompoundForm({ compound, onClose, onSaved }: Props) {
                             return prev.filter((_, fi) => fi !== i)
                           })
                         }}
-                        maxImages={8}
+                        maxImages={20}
                       />
 
                       <div className="flex gap-2">
