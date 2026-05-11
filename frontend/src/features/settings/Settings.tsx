@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../auth/AuthContext'
 import { Plus, Pencil, Trash2, Home, Users, DoorOpen } from 'lucide-react'
 import CompoundForm from './CompoundForm'
 
@@ -30,6 +30,7 @@ export interface Compound {
   weekendPrice: string
   holidayPrice?: string
   yardDescription?: string
+  videoUrl?: string
   rooms: Room[]
   images?: ImageRecord[]
   _count?: { bookings: number }

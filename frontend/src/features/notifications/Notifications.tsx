@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Check, X, FileText, Phone, Mail, IdCard, Loader2, Inbox, Calendar as CalendarIcon, Users } from 'lucide-react'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../auth/AuthContext'
 
 interface Customer {
   id: string

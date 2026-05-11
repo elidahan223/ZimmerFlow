@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../auth/AuthContext'
 import { X, Check, ChevronDown, ChevronUp } from 'lucide-react'
 
 interface Room {
@@ -175,9 +175,10 @@ export default function BookingForm({ compounds, onClose, onCreated }: Props) {
       <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] relative shadow-xl flex flex-col overflow-hidden" dir="rtl">
         <button
           onClick={onClose}
+          aria-label="סגור טופס"
           className="absolute top-4 left-4 text-neutral-400 hover:text-neutral-700 transition-colors z-10"
         >
-          <X className="w-5 h-5" />
+          <X className="w-5 h-5" aria-hidden="true" />
         </button>
 
         <div className="overflow-y-auto flex-1" style={{ direction: 'ltr' }}>

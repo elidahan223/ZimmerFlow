@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { FileText, Download, Loader2, Inbox, CheckCircle, Clock, XCircle, Calendar as CalendarIcon, Users } from 'lucide-react'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../auth/AuthContext'
 
 interface Compound {
   id: string

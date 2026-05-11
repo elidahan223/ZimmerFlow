@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { MessageCircle, X, Send, Loader2, FileSignature } from 'lucide-react'
-import { useAuth } from '../context/AuthContext'
-import BookingRequestModal, { type BookingInitialValues } from './BookingRequestModal'
+import { useAuth } from '../auth/AuthContext'
+import BookingRequestModal, { type BookingInitialValues } from '../booking/BookingRequestModal'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -40,7 +40,7 @@ export default function AgentChat({ compoundId, compoundName }: Props) {
   const [display, setDisplay] = useState<DisplayMessage[]>([
     {
       role: 'assistant',
-      text: `שלום! 👋 אני הסוכן הוירטואלי של${compoundName ? ' ' + compoundName : ' המתחם'}. אני יכול לעזור לך לבדוק זמינות, להבין על המקום ולפתוח הזמנה. במה אוכל לעזור?`,
+      text: `שלום! 👋 אני **אקי** - הסוכן הוירטואלי של${compoundName ? ' ' + compoundName : ' המתחם'}. אני מכיר את כל המתחם לעומק - חדרים, מחירים, כללים, סביבה - ואני זמין כדי לעזור לך לבדוק זמינות, להבין על המקום ולפתוח הזמנה. במה אוכל לעזור? 😊`,
     },
   ])
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -115,14 +115,22 @@ export default function AgentChat({ compoundId, compoundName }: Props) {
 
   return (
     <>
-      {/* Floating bubble */}
+      {/* Floating bubble - "אקי" agent */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-24 sm:bottom-6 left-6 z-[60] bg-neutral-900 text-white rounded-full p-4 shadow-xl hover:bg-neutral-700 transition-all hover:scale-105"
-          aria-label="פתח צ'אט"
+          aria-label="פתח צ'אט עם אקי - הסוכן הוירטואלי"
+          className="fixed bottom-24 sm:bottom-6 left-4 sm:left-6 z-[60] flex items-center gap-3 bg-gradient-to-l from-neutral-900 to-neutral-700 text-white rounded-full pr-5 pl-3 py-3 shadow-2xl hover:shadow-emerald-500/20 hover:scale-105 transition-all"
+          dir="rtl"
         >
-          <MessageCircle className="w-6 h-6" />
+          <div className="text-right">
+            <div className="font-bold text-sm leading-tight">אקי - שאל אותי הכל</div>
+            <div className="text-[11px] text-neutral-300 leading-tight">מכיר את כל המתחם · זמין 24/7</div>
+          </div>
+          <div className="relative w-11 h-11 bg-white/10 rounded-full flex items-center justify-center shrink-0">
+            <MessageCircle className="w-5 h-5" aria-hidden="true" />
+            <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full ring-2 ring-neutral-800" aria-hidden="true" />
+          </div>
         </button>
       )}
 
@@ -135,15 +143,22 @@ export default function AgentChat({ compoundId, compoundName }: Props) {
         >
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
-            <div>
-              <h3 className="font-bold text-neutral-900">סוכן וירטואלי</h3>
-              <p className="text-xs text-neutral-400">בודק זמינות ופותח הזמנה</p>
+            <div className="flex items-center gap-3">
+              <div className="relative w-10 h-10 bg-gradient-to-br from-neutral-800 to-neutral-600 rounded-full flex items-center justify-center text-white font-bold">
+                א
+                <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full ring-2 ring-white" aria-hidden="true" />
+              </div>
+              <div>
+                <h3 className="font-bold text-neutral-900 leading-tight">אקי</h3>
+                <p className="text-xs text-emerald-600 leading-tight font-medium">● זמין · מכיר את כל המתחם</p>
+              </div>
             </div>
             <button
               onClick={() => setOpen(false)}
-              className="text-neutral-400 hover:text-neutral-700 transition-colors"
+              aria-label="סגור צ'אט"
+              className="text-neutral-400 hover:text-neutral-700 transition-colors p-1"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5" aria-hidden="true" />
             </button>
           </div>
 
@@ -194,7 +209,7 @@ export default function AgentChat({ compoundId, compoundName }: Props) {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKey}
-                placeholder="כתוב הודעה..."
+                placeholder="שאל את אקי..."
                 rows={1}
                 className="flex-1 resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm focus:outline-none focus:border-neutral-400 max-h-24"
                 disabled={loading}
@@ -202,9 +217,10 @@ export default function AgentChat({ compoundId, compoundName }: Props) {
               <button
                 onClick={send}
                 disabled={loading || !input.trim()}
+                aria-label="שלח הודעה"
                 className="bg-neutral-900 text-white rounded-xl p-2.5 hover:bg-neutral-700 transition-colors disabled:opacity-40"
               >
-                <Send className="w-4 h-4" />
+                <Send className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
           </div>

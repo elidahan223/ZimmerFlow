@@ -67,7 +67,7 @@ router.get('/:id', async (req, res, next) => {
 // OWNER - יצירת מתחם
 router.post('/', requireOwner, async (req, res, next) => {
   try {
-    const { name, description, tagline, capacity, weekdayPrice, weekendPrice, holidayPrice, yardDescription, status } = req.body;
+    const { name, description, tagline, capacity, weekdayPrice, weekendPrice, holidayPrice, yardDescription, videoUrl, status } = req.body;
     const compound = await prisma.compound.create({
       data: {
         name,
@@ -78,6 +78,7 @@ router.post('/', requireOwner, async (req, res, next) => {
         weekendPrice: parseFloat(weekendPrice) || 0,
         holidayPrice: holidayPrice ? parseFloat(holidayPrice) : null,
         yardDescription,
+        videoUrl: videoUrl || null,
         status: status || 'ACTIVE',
       },
       include: {
@@ -97,7 +98,7 @@ router.post('/', requireOwner, async (req, res, next) => {
 // OWNER - עדכון מתחם
 router.put('/:id', requireOwner, async (req, res, next) => {
   try {
-    const { name, description, tagline, capacity, weekdayPrice, weekendPrice, holidayPrice, yardDescription, status } = req.body;
+    const { name, description, tagline, capacity, weekdayPrice, weekendPrice, holidayPrice, yardDescription, videoUrl, status } = req.body;
     const compound = await prisma.compound.update({
       where: { id: req.params.id },
       data: {
@@ -109,6 +110,7 @@ router.put('/:id', requireOwner, async (req, res, next) => {
         weekendPrice: parseFloat(weekendPrice) || 0,
         holidayPrice: holidayPrice ? parseFloat(holidayPrice) : null,
         yardDescription,
+        videoUrl: videoUrl || null,
         status,
       },
       include: {

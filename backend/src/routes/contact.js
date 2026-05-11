@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const { contactLimit } = require('../middleware/rateLimit');
 
-router.post('/', async (req, res, next) => {
+router.post('/', contactLimit, async (req, res, next) => {
   try {
     const { name, phone, email, message } = req.body;
 

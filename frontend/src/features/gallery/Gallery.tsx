@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, ChevronRight, ChevronLeft, Users, DoorOpen } from 'lucide-react'
+import { X, ChevronRight, ChevronLeft, Users, DoorOpen, PlayCircle } from 'lucide-react'
 
 interface CompoundImage {
   id: string
@@ -22,6 +22,7 @@ interface Compound {
   description?: string
   capacity: number
   weekdayPrice: string
+  videoUrl?: string
   rooms: Room[]
   images?: CompoundImage[]
 }
@@ -116,6 +117,17 @@ export default function Gallery({ compoundId }: Props) {
               <span className="text-neutral-400 font-normal"> / לילה</span>
             </span>
           </div>
+          {compound.videoUrl && (
+            <a
+              href={compound.videoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-neutral-900 text-white text-sm font-medium rounded-full hover:bg-neutral-700 transition-colors"
+            >
+              <PlayCircle className="w-4 h-4" aria-hidden="true" />
+              צפייה בסרטון המתחם
+            </a>
+          )}
         </div>
 
         {/* Yard images - horizontal swipe carousel */}
@@ -211,9 +223,10 @@ export default function Gallery({ compoundId }: Props) {
         >
           <button
             onClick={closeLightbox}
+            aria-label="סגור גלריה"
             className="absolute top-4 left-4 sm:top-6 sm:left-6 text-white/60 hover:text-white transition-colors z-10 p-2"
           >
-            <X className="w-6 h-6" />
+            <X className="w-6 h-6" aria-hidden="true" />
           </button>
 
           <button
@@ -233,12 +246,12 @@ export default function Gallery({ compoundId }: Props) {
             }}
             className="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors z-10 p-2"
           >
-            <ChevronLeft className="w-8 h-8 sm:w-10 sm:h-10" />
+            <ChevronLeft className="w-8 h-8 sm:w-10 sm:h-10" aria-hidden="true" />
           </button>
 
           <img
             src={allImages[lightbox]}
-            alt=""
+            alt={`${compound?.name || 'מתחם'} - תמונה ${lightbox + 1} מתוך ${allImages.length}`}
             className="max-h-[80vh] max-w-[95vw] sm:max-w-[85vw] object-contain"
             onClick={(e) => e.stopPropagation()}
           />

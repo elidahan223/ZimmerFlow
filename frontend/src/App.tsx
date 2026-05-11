@@ -1,16 +1,19 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useAuth } from './context/AuthContext'
-import Navbar from './components/Navbar'
-import Gallery from './components/Gallery'
-import Calendar from './components/Calendar'
-import Settings from './components/Settings'
-import Notifications from './components/Notifications'
-import MyBookings from './components/MyBookings'
-import BottomNav from './components/BottomNav'
-import AuthModal from './components/AuthModal'
-import AgentChat from './components/AgentChat'
+import { useAuth } from './features/auth/AuthContext'
+import Navbar from './layout/Navbar'
+import BottomNav from './layout/BottomNav'
+import Gallery from './features/gallery/Gallery'
+import Calendar from './features/calendar/Calendar'
+import Settings from './features/settings/Settings'
+import Notifications from './features/notifications/Notifications'
+import MyBookings from './features/booking/MyBookings'
+import AuthModal from './features/auth/AuthModal'
+import AgentChat from './features/agent/AgentChat'
+import AccessibilityStatement from './features/accessibility/AccessibilityStatement'
+import TermsOfUse from './features/legal/TermsOfUse'
+import PrivacyPolicy from './features/legal/PrivacyPolicy'
 
-export type View = 'gallery' | 'calendar' | 'settings' | 'notifications' | 'my-bookings'
+export type View = 'gallery' | 'calendar' | 'settings' | 'notifications' | 'my-bookings' | 'accessibility' | 'terms' | 'privacy'
 
 export interface CompoundTab {
   id: string
@@ -53,6 +56,19 @@ function App() {
     }
   }, [])
 
+  // Open accessibility statement when URL is /accessibility (e.g. from UserWay widget link)
+  useEffect(() => {
+    if (window.location.pathname === '/accessibility' || window.location.hash === '#accessibility') {
+      setView('accessibility')
+    }
+    if (window.location.pathname === '/terms' || window.location.hash === '#terms') {
+      setView('terms')
+    }
+    if (window.location.pathname === '/privacy' || window.location.hash === '#privacy') {
+      setView('privacy')
+    }
+  }, [])
+
   // Gate admin-only views
   useEffect(() => {
     if ((view === 'settings' || view === 'notifications') && !auth.isOwner) {
@@ -73,12 +89,37 @@ function App() {
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
-      <main style={{ paddingTop: 80 }} className="pb-20 sm:pb-6">
+      <main id="main-content" style={{ paddingTop: 80 }} className="pb-32 sm:pb-6">
         {view === 'gallery' && <Gallery compoundId={selectedCompoundId} />}
         {view === 'calendar' && <Calendar />}
         {view === 'settings' && auth.isOwner && <Settings />}
         {view === 'notifications' && auth.isOwner && <Notifications />}
         {view === 'my-bookings' && auth.isAuthenticated && <MyBookings />}
+        {view === 'accessibility' && <AccessibilityStatement />}
+        {view === 'terms' && <TermsOfUse />}
+        {view === 'privacy' && <PrivacyPolicy />}
+        <footer className="mt-8 border-t border-neutral-100 py-4 px-4 text-center text-xs text-neutral-400 flex flex-wrap justify-center gap-x-4 gap-y-2" dir="rtl">
+          <button
+            onClick={() => setView('accessibility')}
+            className="hover:text-neutral-700 transition-colors underline-offset-2 hover:underline"
+          >
+            הצהרת נגישות
+          </button>
+          <span aria-hidden="true">·</span>
+          <button
+            onClick={() => setView('terms')}
+            className="hover:text-neutral-700 transition-colors underline-offset-2 hover:underline"
+          >
+            תקנון האתר
+          </button>
+          <span aria-hidden="true">·</span>
+          <button
+            onClick={() => setView('privacy')}
+            className="hover:text-neutral-700 transition-colors underline-offset-2 hover:underline"
+          >
+            מדיניות פרטיות
+          </button>
+        </footer>
       </main>
       <BottomNav
         view={view}

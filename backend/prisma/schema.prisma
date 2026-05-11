@@ -53,6 +53,7 @@ model Compound {
   weekendPrice    Decimal     @map("weekend_price")
   holidayPrice    Decimal?    @map("holiday_price")
   yardDescription String?     @map("yard_description")
+  videoUrl        String?     @map("video_url")
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 

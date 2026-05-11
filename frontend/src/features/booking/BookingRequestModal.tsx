@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { X, ArrowRight, ArrowLeft, Check, Phone, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../auth/AuthContext'
 import SignaturePad from './SignaturePad'
 import type { SignaturePadHandle } from './SignaturePad'
 import ContractDocument from './ContractDocument'
@@ -278,8 +278,8 @@ export default function BookingRequestModal({ onClose, onSubmitted, initialValue
             {step === 2 && 'בקשת הזמנה — חתימה על החוזה'}
             {step === 3 && 'הבקשה התקבלה'}
           </h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-neutral-100 flex items-center justify-center">
-            <X className="w-5 h-5 text-neutral-500" />
+          <button onClick={onClose} aria-label="סגור" className="w-8 h-8 rounded-full hover:bg-neutral-100 flex items-center justify-center">
+            <X className="w-5 h-5 text-neutral-500" aria-hidden="true" />
           </button>
         </div>
 

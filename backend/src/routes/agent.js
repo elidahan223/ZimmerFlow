@@ -6,7 +6,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const prisma = require('../config/database');
 const { TOOLS, executeTool } = require('../services/agent');
 const { buildDateHint } = require('../services/hebrewDateParser');
-const { rateLimitAgent } = require('../middleware/rateLimitAgent');
+const { rateLimitAgent } = require('../middleware/rateLimit');
 
 const client = new Anthropic.Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -51,7 +51,7 @@ ${customer?.email ? `אימייל: ${customer.email}` : ''}
 4. אל תקרא ל-create_booking_request עבור לקוח לא מחובר. הכלי יחזיר שגיאה ותראה לא מקצועי.
 זמינות, מידע על המתחם, ומחירים — אפשר לתת ללקוח לא מחובר.`;
 
-  return `אתה סוכן הזמנות של מתחם הצימרים שלנו. דבר עברית בלבד, בטון חם, ידידותי ומקצועי.
+  return `אתה **אקי** - הסוכן הוירטואלי של מתחם הצימרים שלנו. השם שלך הוא אקי, אם שואלים אותך מי אתה - תציג את עצמך בשם הזה. דבר עברית בלבד, בטון חם, ידידותי ומקצועי.
 
 ## תאריך נוכחי: ${today}
 

@@ -7,6 +7,7 @@ const {
   ConfirmSignUpCommand,
   InitiateAuthCommand,
 } = require('@aws-sdk/client-cognito-identity-provider');
+const { authLimit } = require('../middleware/rateLimit');
 
 const cognitoClient = new CognitoIdentityProviderClient({
   region: process.env.AWS_REGION,
@@ -14,7 +15,7 @@ const cognitoClient = new CognitoIdentityProviderClient({
 const CLIENT_ID = process.env.COGNITO_CLIENT_ID;
 
 // POST /api/auth/signup - רישום: יוצר משתמש ב-Cognito + DB
-router.post('/signup', async (req, res, next) => {
+router.post('/signup', authLimit, async (req, res, next) => {
   try {
     const { firstName, lastName, email, phone, password, idNumber, address } = req.body;
 
@@ -82,7 +83,7 @@ router.post('/signup', async (req, res, next) => {
 });
 
 // POST /api/auth/confirm - אימות קוד SMS
-router.post('/confirm', async (req, res, next) => {
+router.post('/confirm', authLimit, async (req, res, next) => {
   try {
     const { phone, code } = req.body;
 
@@ -114,7 +115,7 @@ router.post('/confirm', async (req, res, next) => {
 });
 
 // POST /api/auth/login - התחברות
-router.post('/login', async (req, res, next) => {
+router.post('/login', authLimit, async (req, res, next) => {
   try {
     const { phone, password } = req.body;
 

@@ -22,3 +22,42 @@ body {
 /* Hide scrollbar but keep scrolling */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Accessibility - skip link visible on focus only */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  right: 0;
+  background: #0a0a0a;
+  color: #fff;
+  padding: 12px 20px;
+  z-index: 9999;
+  text-decoration: none;
+  border-radius: 0 0 0 8px;
+  font-weight: 600;
+}
+.skip-link:focus {
+  top: 0;
+  outline: 2px solid #0066cc;
+  outline-offset: 2px;
+}
+
+/* Visible focus on all interactive elements (a11y) */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid #0066cc;
+  outline-offset: 2px;
+}
+
+/* Push UserWay accessibility widget above the BottomNav on mobile */
+@media (max-width: 640px) {
+  .userway_buttons_wrapper,
+  [id^="userwayAccessibilityIcon"],
+  [class*="uwy"] iframe,
+  iframe[title*="ccessibility" i] {
+    bottom: 80px !important;
+  }
+}

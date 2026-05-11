@@ -4,6 +4,7 @@ const prisma = require('../config/database');
 const { requireOwner, requireAuth } = require('../middleware/auth');
 const { deleteContract } = require('../services/s3');
 const { generateContractPdf } = require('../services/contractPdfService');
+const { bookingLimit } = require('../middleware/rateLimit');
 
 const bookingInclude = {
   customer: true,
@@ -98,7 +99,7 @@ router.get('/:id', requireOwner, async (req, res, next) => {
 });
 
 // AUTH - בקשת הזמנה ע"י משתמש מחובר (תומך מרובה מתחמים, מייצר PDF חתום בשרת)
-router.post('/request', requireAuth, async (req, res, next) => {
+router.post('/request', bookingLimit, requireAuth, async (req, res, next) => {
   try {
     const {
       compounds: compoundsInput,

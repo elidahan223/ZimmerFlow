@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CalendarDays, Home, Settings, Bell, FileText } from 'lucide-react'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../features/auth/AuthContext'
 import type { View, CompoundTab } from '../App'
 
 interface Props {

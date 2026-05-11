@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { ChevronRight, ChevronLeft, Plus, Trash2, CheckCircle, Clock, XCircle, Phone, Mail, IdCard, FileText } from 'lucide-react'
-import { useAuth } from '../context/AuthContext'
-import BookingForm from './BookingForm'
-import BookingRequestModal from './BookingRequestModal'
-import { getMonthHolidays } from '../utils/holidays'
+import { useAuth } from '../auth/AuthContext'
+import BookingForm from '../booking/BookingForm'
+import BookingRequestModal from '../booking/BookingRequestModal'
+import { getMonthHolidays } from '../../utils/holidays'
 
 const HEBREW_MONTHS = [
   'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
@@ -186,9 +186,9 @@ export default function Calendar() {
       {/* Calendar grid */}
       <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4">
-          <button onClick={nextMonth} className="w-10 h-10 rounded-full hover:bg-neutral-100 active:bg-neutral-200 flex items-center justify-center transition-colors"><ChevronRight className="w-6 h-6 text-neutral-700" /></button>
+          <button onClick={nextMonth} aria-label="חודש הבא" className="w-10 h-10 rounded-full hover:bg-neutral-100 active:bg-neutral-200 flex items-center justify-center transition-colors"><ChevronRight className="w-6 h-6 text-neutral-700" aria-hidden="true" /></button>
           <h2 className="text-lg font-bold text-neutral-900">{HEBREW_MONTHS[month]} {year}</h2>
-          <button onClick={prevMonth} className="w-10 h-10 rounded-full hover:bg-neutral-100 active:bg-neutral-200 flex items-center justify-center transition-colors"><ChevronLeft className="w-6 h-6 text-neutral-700" /></button>
+          <button onClick={prevMonth} aria-label="חודש קודם" className="w-10 h-10 rounded-full hover:bg-neutral-100 active:bg-neutral-200 flex items-center justify-center transition-colors"><ChevronLeft className="w-6 h-6 text-neutral-700" aria-hidden="true" /></button>
         </div>
 
         {auth.isAuthenticated && isOwner && (

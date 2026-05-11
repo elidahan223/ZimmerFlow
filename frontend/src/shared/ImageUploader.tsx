@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { Plus, X, ImageIcon } from 'lucide-react'
-import type { ImageRecord } from './Settings'
+import type { ImageRecord } from '../features/settings/Settings'
 
 export interface PendingFile {
   file: File
@@ -53,15 +53,16 @@ export default function ImageUploader({
 
       <div className="flex flex-wrap gap-2">
         {/* Existing images */}
-        {visibleExisting.map((img) => (
+        {visibleExisting.map((img, idx) => (
           <div key={img.id} className="relative w-20 h-20 rounded-xl overflow-hidden group">
-            <img src={img.url} alt="" className="w-full h-full object-cover" />
+            <img src={img.url} alt={`${label || 'תמונה'} ${idx + 1}`} className="w-full h-full object-cover" />
             <button
               type="button"
               onClick={() => onRemoveExisting(img.id)}
+              aria-label={`מחק תמונה ${idx + 1}`}
               className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
           </div>
         ))}
@@ -69,14 +70,15 @@ export default function ImageUploader({
         {/* Pending (new) files */}
         {pendingFiles.map((pf, i) => (
           <div key={`pending-${i}`} className="relative w-20 h-20 rounded-xl overflow-hidden group">
-            <img src={pf.preview} alt="" className="w-full h-full object-cover" />
+            <img src={pf.preview} alt={`תמונה חדשה ${i + 1} - לפני שמירה`} className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-emerald-500/10 pointer-events-none" />
             <button
               type="button"
               onClick={() => onRemovePending(i)}
+              aria-label={`הסר תמונה חדשה ${i + 1}`}
               className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
           </div>
         ))}

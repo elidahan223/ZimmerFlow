@@ -1,14 +1,14 @@
 import { useState } from 'react'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../auth/AuthContext'
 import { X, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
-import ImageUploader, { type PendingFile } from './ImageUploader'
+import ImageUploader, { type PendingFile } from '../../shared/ImageUploader'
 import type { Compound, ImageRecord } from './Settings'
 import {
   uploadImageToS3,
   saveCompoundImage,
   saveRoomImage,
   deleteImage,
-} from '../utils/uploadImage'
+} from '../../utils/uploadImage'
 
 interface Props {
   compound: Compound | null
@@ -40,6 +40,7 @@ export default function CompoundForm({ compound, onClose, onSaved }: Props) {
     description: compound?.description || '',
     tagline: compound?.tagline || '',
     yardDescription: compound?.yardDescription || '',
+    videoUrl: compound?.videoUrl || '',
     capacity: compound?.capacity?.toString() || '4',
     weekdayPrice: compound?.weekdayPrice ? parseFloat(compound.weekdayPrice).toString() : '',
     weekendPrice: compound?.weekendPrice ? parseFloat(compound.weekendPrice).toString() : '',
@@ -277,9 +278,10 @@ export default function CompoundForm({ compound, onClose, onSaved }: Props) {
       >
         <button
           onClick={onClose}
+          aria-label="סגור טופס"
           className="absolute top-4 left-4 text-neutral-400 hover:text-neutral-700 transition-colors z-10"
         >
-          <X className="w-5 h-5" />
+          <X className="w-5 h-5" aria-hidden="true" />
         </button>
 
         <div className="overflow-y-auto flex-1" style={{ direction: 'ltr' }}>
@@ -338,6 +340,24 @@ export default function CompoundForm({ compound, onClose, onSaved }: Props) {
                   className={inputClass + ' h-16 resize-none'}
                   placeholder="בריכה, ג'קוזי, גינה..."
                 />
+              </div>
+
+              {/* קישור לסרטון */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                  קישור לסרטון המתחם
+                </label>
+                <input
+                  type="url"
+                  value={form.videoUrl}
+                  onChange={(e) => set('videoUrl', e.target.value)}
+                  className={inputClass}
+                  placeholder="https://youtu.be/... או כל קישור אחר"
+                  dir="ltr"
+                />
+                <p className="text-[11px] text-neutral-400 mt-1">
+                  לא חובה. אם תזין קישור, יופיע כפתור "צפייה בסרטון" בדף המתחם.
+                </p>
               </div>
 
               {/* תמונות חצר */}

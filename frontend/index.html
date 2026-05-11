@@ -14,7 +14,50 @@
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   </head>
   <body>
+    <a href="#main-content" class="skip-link">דלג לתוכן הראשי</a>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- UserWay accessibility widget (free tier) -->
+    <script>
+      (function (d) {
+        var s = d.createElement("script");
+        s.setAttribute("data-position", 3);
+        s.setAttribute("data-language", "he");
+        s.setAttribute("data-color", "#0a0a0a");
+        s.setAttribute("data-type", 1);
+        s.setAttribute("data-statement_text", "הצהרת הנגישות שלנו");
+        s.setAttribute("data-statement_url", "/accessibility");
+        s.setAttribute("data-mobile", true);
+        s.setAttribute("data-account", "FREE");
+        s.src = "https://cdn.userway.org/widget.js";
+        (d.body || d.head).appendChild(s);
+      })(document);
+
+      /* Force the widget above the mobile BottomNav (~70px). */
+      (function () {
+        function pushUp() {
+          var sel = '[id^="userwayAccessibilityIcon"], .uwy.userway_p3, .userway_buttons_wrapper';
+          var el = document.querySelector(sel);
+          if (el && window.innerWidth <= 640) {
+            el.style.bottom = '80px';
+          } else if (el) {
+            el.style.bottom = '';
+          }
+        }
+        var t = setInterval(function () {
+          if (document.querySelector('[id^="userwayAccessibilityIcon"], .uwy')) {
+            pushUp();
+            clearInterval(t);
+            window.addEventListener('resize', pushUp);
+          }
+        }, 300);
+        setTimeout(function () { clearInterval(t); }, 8000);
+      })();
+    </script>
+    <noscript>
+      לקבלת אפשרויות נגישות יש להפעיל JavaScript.
+      <a href="/accessibility">הצהרת הנגישות שלנו</a>
+    </noscript>
   </body>
 </html>

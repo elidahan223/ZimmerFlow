@@ -1,4 +1,4 @@
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../features/auth/AuthContext'
 import { LogIn, LogOut, User } from 'lucide-react'
 
 export default function Navbar() {
