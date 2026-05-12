@@ -137,34 +137,9 @@ router.post('/request', bookingLimit, requireAuth, async (req, res, next) => {
         return res.status(404).json({ error: 'מתחם לא נמצא' });
       }
 
-      if (roomIds.length > 0) {
-        const overlap = await prisma.bookingRoom.findFirst({
-          where: {
-            roomId: { in: roomIds },
-            booking: {
-              status: { in: ['PENDING', 'CONFIRMED'] },
-              checkIn: { lt: new Date(checkOut) },
-              checkOut: { gt: new Date(checkIn) },
-            },
-          },
-          include: { room: true },
-        });
-        if (overlap) {
-          return res.status(409).json({ error: `חדר "${overlap.room.name}" תפוס בתאריכים המבוקשים` });
-        }
-      } else {
-        const overlap = await prisma.booking.findFirst({
-          where: {
-            compoundId,
-            status: { in: ['PENDING', 'CONFIRMED'] },
-            checkIn: { lt: new Date(checkOut) },
-            checkOut: { gt: new Date(checkIn) },
-          },
-        });
-        if (overlap) {
-          return res.status(409).json({ error: `המתחם "${compound.name}" תפוס בתאריכים המבוקשים` });
-        }
-      }
+      // Note: overlap check is performed inside the Serializable transaction below
+      // to prevent TOCTOU race conditions. Doing it here would only catch the
+      // non-concurrent case and add a redundant DB roundtrip.
 
       const pickedRoomNames = roomIds
         .map((rid) => compound.rooms.find((r) => r.id === rid)?.name)
@@ -229,6 +204,8 @@ router.post('/request', bookingLimit, requireAuth, async (req, res, next) => {
       signedDate: new Date().toISOString().slice(0, 10),
     };
 
+    // Generate PDF first (so we have the contract key for the transaction).
+    // If anything fails after this point, we MUST delete the orphan from S3.
     let contractKey;
     try {
       const result = await generateContractPdf(pdfData);
@@ -238,56 +215,121 @@ router.post('/request', bookingLimit, requireAuth, async (req, res, next) => {
       return res.status(500).json({ error: 'שגיאה ביצירת קובץ החוזה' });
     }
 
-    // Create one booking + contract per compound, all sharing the same contractKey
-    const created = await prisma.$transaction(async (tx) => {
-      const out = [];
-      for (const c of compoundDetails) {
-        const booking = await tx.booking.create({
-          data: {
-            customerId: customer.id,
-            compoundId: c.compoundId,
-            createdByUserId: req.user.id,
-            checkIn: new Date(checkIn),
-            checkOut: new Date(checkOut),
-            guestsCount: guestsCount || ((adults || 2) + (children || 0)),
-            adults: adults || 2,
-            children: children || 0,
-            status: 'PENDING',
-            customerNotes: customerNotes || null,
-            ...(c.roomIds.length > 0 && {
-              bookingRooms: { create: c.roomIds.map((roomId) => ({ roomId })) },
-            }),
-          },
-          include: bookingInclude,
-        });
+    // Race-safe booking creation: re-check overlaps INSIDE a Serializable transaction.
+    // Postgres will abort one transaction with code 40001 if two concurrent bookings
+    // would conflict. We retry up to 3 times on serialization failure.
+    let created;
+    try {
+      const MAX_RETRIES = 3;
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          created = await prisma.$transaction(async (tx) => {
+            // Re-check every compound's availability INSIDE the transaction
+            for (const c of compoundDetails) {
+              if (c.roomIds.length > 0) {
+                const overlap = await tx.bookingRoom.findFirst({
+                  where: {
+                    roomId: { in: c.roomIds },
+                    booking: {
+                      status: { in: ['PENDING', 'CONFIRMED'] },
+                      checkIn: { lt: new Date(checkOut) },
+                      checkOut: { gt: new Date(checkIn) },
+                    },
+                  },
+                  include: { room: true },
+                });
+                if (overlap) {
+                  const err = new Error(`חדר "${overlap.room.name}" תפוס בתאריכים המבוקשים`);
+                  err.statusCode = 409;
+                  throw err;
+                }
+              } else {
+                const overlap = await tx.booking.findFirst({
+                  where: {
+                    compoundId: c.compoundId,
+                    status: { in: ['PENDING', 'CONFIRMED'] },
+                    checkIn: { lt: new Date(checkOut) },
+                    checkOut: { gt: new Date(checkIn) },
+                  },
+                });
+                if (overlap) {
+                  const err = new Error(`המתחם "${c.compoundName}" תפוס בתאריכים המבוקשים`);
+                  err.statusCode = 409;
+                  throw err;
+                }
+              }
+            }
 
-        const contractNumber = `CTR-${Date.now()}-${booking.id.slice(0, 6)}`;
-        const contract = await tx.contract.create({
-          data: {
-            bookingId: booking.id,
-            contractNumber,
-            templateVersion: 'v2',
-            status: 'SIGNED',
-            fileUrl: contractKey,
-            signedFileUrl: contractKey,
-            signedAt: new Date(),
-          },
-        });
+            const out = [];
+            for (const c of compoundDetails) {
+              const booking = await tx.booking.create({
+                data: {
+                  customerId: customer.id,
+                  compoundId: c.compoundId,
+                  createdByUserId: req.user.id,
+                  checkIn: new Date(checkIn),
+                  checkOut: new Date(checkOut),
+                  guestsCount: guestsCount || ((adults || 2) + (children || 0)),
+                  adults: adults || 2,
+                  children: children || 0,
+                  status: 'PENDING',
+                  customerNotes: customerNotes || null,
+                  ...(c.roomIds.length > 0 && {
+                    bookingRooms: { create: c.roomIds.map((roomId) => ({ roomId })) },
+                  }),
+                },
+                include: bookingInclude,
+              });
 
-        await tx.signatureEvent.create({
-          data: {
-            contractId: contract.id,
-            eventType: 'SIGNED',
-            ipAddress: req.ip || req.headers['x-forwarded-for'] || null,
-            userAgent: req.headers['user-agent'] || null,
-            metadata: { checkInTime, checkOutTime, totalPrice, signedDate: pdfData.signedDate },
-          },
-        });
+              const contractNumber = `CTR-${Date.now()}-${booking.id.slice(0, 6)}`;
+              const contract = await tx.contract.create({
+                data: {
+                  bookingId: booking.id,
+                  contractNumber,
+                  templateVersion: 'v2',
+                  status: 'SIGNED',
+                  fileUrl: contractKey,
+                  signedFileUrl: contractKey,
+                  signedAt: new Date(),
+                },
+              });
 
-        out.push({ booking, contract });
+              await tx.signatureEvent.create({
+                data: {
+                  contractId: contract.id,
+                  eventType: 'SIGNED',
+                  ipAddress: req.ip || req.headers['x-forwarded-for'] || null,
+                  userAgent: req.headers['user-agent'] || null,
+                  metadata: { checkInTime, checkOutTime, totalPrice, signedDate: pdfData.signedDate },
+                },
+              });
+
+              out.push({ booking, contract });
+            }
+            return out;
+          }, { isolationLevel: 'Serializable' });
+
+          break;
+        } catch (txErr) {
+          const isSerializationFailure =
+            txErr.code === 'P2034' ||
+            txErr.code === '40001' ||
+            (txErr.message || '').toLowerCase().includes('could not serialize');
+          if (isSerializationFailure && attempt < MAX_RETRIES) {
+            await new Promise((r) => setTimeout(r, 50 * attempt));
+            continue;
+          }
+          throw txErr;
+        }
       }
-      return out;
-    });
+    } catch (txErr) {
+      // Cleanup orphan PDF in S3 — booking creation failed
+      await deleteContract(contractKey).catch(() => {});
+      if (txErr.statusCode === 409) {
+        return res.status(409).json({ error: txErr.message });
+      }
+      throw txErr;
+    }
 
     res.status(201).json({ bookings: created.map((c) => c.booking), contractKey });
   } catch (err) {

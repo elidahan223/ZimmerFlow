@@ -3,6 +3,24 @@ const router = express.Router();
 const prisma = require('../config/database');
 const { requireOwner } = require('../middleware/auth');
 const { deleteObject } = require('../services/s3');
+const { requireString, optionalString, requireNumber, optionalEnum } = require('../middleware/validate');
+
+const VALID_STATUSES = ['ACTIVE', 'INACTIVE', 'MAINTENANCE'];
+
+function validateCompoundBody(body) {
+  return {
+    name: requireString(body.name, 'שם המתחם', { min: 2, max: 100 }),
+    description: optionalString(body.description, 'תיאור', { max: 2000 }),
+    tagline: optionalString(body.tagline, 'תגית', { max: 200 }),
+    capacity: requireNumber(body.capacity, 'תפוסה', { min: 1, max: 50 }),
+    weekdayPrice: requireNumber(body.weekdayPrice, 'מחיר יום חול', { min: 0, max: 100000 }),
+    weekendPrice: requireNumber(body.weekendPrice, 'מחיר סוף שבוע', { min: 0, max: 100000 }),
+    holidayPrice: body.holidayPrice ? requireNumber(body.holidayPrice, 'מחיר חג', { min: 0, max: 100000 }) : null,
+    yardDescription: optionalString(body.yardDescription, 'תיאור חצר', { max: 1000 }),
+    videoUrl: optionalString(body.videoUrl, 'קישור לסרטון', { max: 500 }),
+    status: optionalEnum(body.status, 'סטטוס', VALID_STATUSES) || 'ACTIVE',
+  };
+}
 
 // PUBLIC - מתחמים פעילים עם חדרים ותמונות
 router.get('/', async (req, res, next) => {
@@ -67,20 +85,9 @@ router.get('/:id', async (req, res, next) => {
 // OWNER - יצירת מתחם
 router.post('/', requireOwner, async (req, res, next) => {
   try {
-    const { name, description, tagline, capacity, weekdayPrice, weekendPrice, holidayPrice, yardDescription, videoUrl, status } = req.body;
+    const data = validateCompoundBody(req.body);
     const compound = await prisma.compound.create({
-      data: {
-        name,
-        description,
-        tagline,
-        capacity: parseInt(capacity) || 1,
-        weekdayPrice: parseFloat(weekdayPrice) || 0,
-        weekendPrice: parseFloat(weekendPrice) || 0,
-        holidayPrice: holidayPrice ? parseFloat(holidayPrice) : null,
-        yardDescription,
-        videoUrl: videoUrl || null,
-        status: status || 'ACTIVE',
-      },
+      data,
       include: {
         rooms: {
           orderBy: { sortOrder: 'asc' },
@@ -98,21 +105,10 @@ router.post('/', requireOwner, async (req, res, next) => {
 // OWNER - עדכון מתחם
 router.put('/:id', requireOwner, async (req, res, next) => {
   try {
-    const { name, description, tagline, capacity, weekdayPrice, weekendPrice, holidayPrice, yardDescription, videoUrl, status } = req.body;
+    const data = validateCompoundBody(req.body);
     const compound = await prisma.compound.update({
       where: { id: req.params.id },
-      data: {
-        name,
-        description,
-        tagline,
-        capacity: parseInt(capacity) || 1,
-        weekdayPrice: parseFloat(weekdayPrice) || 0,
-        weekendPrice: parseFloat(weekendPrice) || 0,
-        holidayPrice: holidayPrice ? parseFloat(holidayPrice) : null,
-        yardDescription,
-        videoUrl: videoUrl || null,
-        status,
-      },
+      data,
       include: {
         rooms: {
           orderBy: { sortOrder: 'asc' },

@@ -12,8 +12,11 @@ import AgentChat from './features/agent/AgentChat'
 import AccessibilityStatement from './features/accessibility/AccessibilityStatement'
 import TermsOfUse from './features/legal/TermsOfUse'
 import PrivacyPolicy from './features/legal/PrivacyPolicy'
+import NotFound from './shared/NotFound'
 
-export type View = 'gallery' | 'calendar' | 'settings' | 'notifications' | 'my-bookings' | 'accessibility' | 'terms' | 'privacy'
+export type View = 'gallery' | 'calendar' | 'settings' | 'notifications' | 'my-bookings' | 'accessibility' | 'terms' | 'privacy' | 'not-found'
+
+const KNOWN_PATHS = new Set(['/', '/accessibility', '/terms', '/privacy'])
 
 export interface CompoundTab {
   id: string
@@ -56,16 +59,18 @@ function App() {
     }
   }, [])
 
-  // Open accessibility statement when URL is /accessibility (e.g. from UserWay widget link)
+  // Resolve initial view from URL path
   useEffect(() => {
-    if (window.location.pathname === '/accessibility' || window.location.hash === '#accessibility') {
+    const path = window.location.pathname
+    const hash = window.location.hash
+    if (path === '/accessibility' || hash === '#accessibility') {
       setView('accessibility')
-    }
-    if (window.location.pathname === '/terms' || window.location.hash === '#terms') {
+    } else if (path === '/terms' || hash === '#terms') {
       setView('terms')
-    }
-    if (window.location.pathname === '/privacy' || window.location.hash === '#privacy') {
+    } else if (path === '/privacy' || hash === '#privacy') {
       setView('privacy')
+    } else if (!KNOWN_PATHS.has(path)) {
+      setView('not-found')
     }
   }, [])
 
@@ -87,8 +92,8 @@ function App() {
   if (auth.isLoading) return null
 
   return (
-    <div className="min-h-screen bg-white">
-      <Navbar />
+    <div className="min-h-screen bg-bone">
+      <Navbar transparentAtTop={view === 'gallery'} />
       <main id="main-content" style={{ paddingTop: 80 }} className="pb-32 sm:pb-6">
         {view === 'gallery' && <Gallery compoundId={selectedCompoundId} />}
         {view === 'calendar' && <Calendar />}
@@ -98,24 +103,25 @@ function App() {
         {view === 'accessibility' && <AccessibilityStatement />}
         {view === 'terms' && <TermsOfUse />}
         {view === 'privacy' && <PrivacyPolicy />}
-        <footer className="mt-8 border-t border-neutral-100 py-4 px-4 text-center text-xs text-neutral-400 flex flex-wrap justify-center gap-x-4 gap-y-2" dir="rtl">
+        {view === 'not-found' && <NotFound onGoHome={() => { window.history.replaceState({}, '', '/'); setView('gallery') }} />}
+        <footer className="mt-16 border-t border-divider py-6 px-4 flex flex-wrap justify-center items-center gap-x-4 gap-y-2 label-airy text-[10px] text-charcoal-soft/50" dir="rtl">
           <button
             onClick={() => setView('accessibility')}
-            className="hover:text-neutral-700 transition-colors underline-offset-2 hover:underline"
+            className="hover:text-charcoal transition-colors"
           >
             הצהרת נגישות
           </button>
-          <span aria-hidden="true">·</span>
+          <span className="text-muted" aria-hidden="true">·</span>
           <button
             onClick={() => setView('terms')}
-            className="hover:text-neutral-700 transition-colors underline-offset-2 hover:underline"
+            className="hover:text-charcoal transition-colors"
           >
             תקנון האתר
           </button>
-          <span aria-hidden="true">·</span>
+          <span className="text-muted" aria-hidden="true">·</span>
           <button
             onClick={() => setView('privacy')}
-            className="hover:text-neutral-700 transition-colors underline-offset-2 hover:underline"
+            className="hover:text-charcoal transition-colors"
           >
             מדיניות פרטיות
           </button>

@@ -11,6 +11,7 @@ const { rateLimitAgent } = require('../middleware/rateLimit');
 const client = new Anthropic.Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const OWNER_PHONE = process.env.OWNER_PHONE || '054-123-4567';
+const WIFI_PASSWORD = process.env.WIFI_PASSWORD || '****';
 
 // Limits for incoming requests
 const MAX_MESSAGE_CHARS = 1000;
@@ -51,7 +52,7 @@ ${customer?.email ? `אימייל: ${customer.email}` : ''}
 4. אל תקרא ל-create_booking_request עבור לקוח לא מחובר. הכלי יחזיר שגיאה ותראה לא מקצועי.
 זמינות, מידע על המתחם, ומחירים — אפשר לתת ללקוח לא מחובר.`;
 
-  return `אתה **אקי** - הסוכן הוירטואלי של מתחם הצימרים שלנו. השם שלך הוא אקי, אם שואלים אותך מי אתה - תציג את עצמך בשם הזה. דבר עברית בלבד, בטון חם, ידידותי ומקצועי.
+  return `אתה **העוזר** - הסוכן הוירטואלי של מתחם הצימרים שלנו. אם שואלים אותך מי אתה - תציג את עצמך כעוזר הוירטואלי של המתחם. דבר עברית בלבד, בטון חם, ידידותי ומקצועי.
 
 ## תאריך נוכחי: ${today}
 
@@ -94,7 +95,7 @@ ${authBlock}
 - **בריכה**: יש בריכה (מגודרת - בטיחותי לילדים).
 - **ג'קוזי**: יש.
 - **מזגן**: בכל חדר.
-- **WiFi**: יש - הסיסמה היא **10203040** (תן ללקוחות שמתעניינים).
+- **WiFi**: יש - הסיסמה היא **${WIFI_PASSWORD}** (תן ללקוחות שמתעניינים).
 - **חניה**: עד 9 רכבים.
 - **מיטות תינוק**: יש.
 
