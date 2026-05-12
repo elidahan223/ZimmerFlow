@@ -7,7 +7,7 @@ const {
   ConfirmSignUpCommand,
   InitiateAuthCommand,
 } = require('@aws-sdk/client-cognito-identity-provider');
-const { authLimit } = require('../middleware/rateLimit');
+const { authLimit, refreshLimit } = require('../middleware/rateLimit');
 
 const cognitoClient = new CognitoIdentityProviderClient({
   region: process.env.AWS_REGION,
@@ -173,7 +173,7 @@ router.post('/login', authLimit, async (req, res, next) => {
 });
 
 // POST /api/auth/refresh - רענון טוקן
-router.post('/refresh', async (req, res, next) => {
+router.post('/refresh', refreshLimit, async (req, res, next) => {
   try {
     const { refreshToken } = req.body;
     if (!refreshToken) {

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { X, ChevronRight, ChevronLeft, Users, DoorOpen, PlayCircle } from 'lucide-react'
+import { useState, useEffect, useRef, type ReactNode } from 'react'
+import { X, ChevronRight, ChevronLeft, PlayCircle } from 'lucide-react'
 
 interface CompoundImage {
   id: string
@@ -30,6 +30,8 @@ interface Compound {
 interface Props {
   compoundId: string | null
 }
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
 
 export default function Gallery({ compoundId }: Props) {
   const [compound, setCompound] = useState<Compound | null>(null)
@@ -76,167 +78,189 @@ export default function Gallery({ compoundId }: Props) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-neutral-300 border-t-neutral-800 rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center h-64 gap-4" role="status" aria-live="polite">
+        <div className="w-px h-12 bg-gold/50 animate-pulse" />
+        <span className="label-airy text-[10px] text-muted">טוען</span>
       </div>
     )
   }
 
   if (!compound) {
     return (
-      <div className="text-center py-20 text-neutral-400">
-        <p className="text-lg">אין מתחם להצגה</p>
+      <div className="text-center py-24" dir="rtl">
+        <span className="label-airy text-[10px] text-muted block mb-4">לא זמין</span>
+        <div className="w-8 h-px bg-gold/60 mx-auto mb-4" />
+        <p className="font-editorial text-2xl sm:text-3xl text-charcoal mb-2">אין מתחם להצגה</p>
+        <p className="text-sm text-charcoal-soft/70 font-light">חזרו אלינו מאוחר יותר</p>
       </div>
     )
   }
 
   const yardImages = compound.images || []
+  const heroImage = yardImages[0]?.url
+  const roomsWithImages = compound.rooms.filter((r) => (r.images || []).length > 0)
+  const totalSections = (yardImages.length > 0 ? 1 : 0) + roomsWithImages.length
+  const showIndex = totalSections > 1
 
   return (
     <>
-      <div className="w-full max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
-        {/* Header */}
-        <div className="mb-3 sm:mb-5" dir="rtl">
-          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-neutral-900">
-            {compound.name}
-          </h2>
-          {compound.tagline && (
-            <p className="text-neutral-500 text-sm mt-0.5">{compound.tagline}</p>
-          )}
-          <div className="flex items-center gap-3 sm:gap-4 mt-2 text-xs sm:text-sm text-neutral-400">
-            <span className="flex items-center gap-1">
-              <Users className="w-3.5 h-3.5" />
-              עד {compound.capacity}
+      {/* HERO */}
+      {heroImage && (
+        <div className="relative w-full h-[260px] sm:h-[520px] -mt-20 mb-10 sm:mb-16 overflow-hidden">
+          <img
+            src={heroImage}
+            alt={`${compound.name} - תמונה ראשית`}
+            className="absolute inset-0 w-full h-full object-cover"
+            loading="eager"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-charcoal/75 via-charcoal/15 to-transparent" />
+
+          <div
+            className="absolute inset-0 flex flex-col justify-end px-5 pb-8 sm:px-12 sm:pb-14"
+            dir="rtl"
+          >
+            <span className="label-airy text-[10px] sm:text-xs text-bone/75 mb-3 sm:mb-4">
+              BOUTIQUE STAY
             </span>
-            <span className="flex items-center gap-1">
-              <DoorOpen className="w-3.5 h-3.5" />
-              {compound.rooms.length} חדרים
-            </span>
-            <span className="text-neutral-700 font-semibold">
-              ₪{parseFloat(compound.weekdayPrice).toLocaleString()}
-              <span className="text-neutral-400 font-normal"> / לילה</span>
-            </span>
+            <div className="w-10 h-px bg-gold mb-4 sm:mb-5" />
+            <h1 className="font-editorial text-bone text-4xl sm:text-6xl lg:text-7xl leading-[1.05] max-w-[88%]">
+              {compound.name}
+            </h1>
+            {compound.tagline && (
+              <p className="text-bone/85 text-sm sm:text-lg font-light max-w-[80%] mt-4 leading-relaxed">
+                {compound.tagline}
+              </p>
+            )}
           </div>
+        </div>
+      )}
+
+      <div className="w-full max-w-6xl mx-auto px-5 sm:px-8 lg:px-10 pb-16">
+        {/* Editorial meta strip */}
+        <section className="mb-12 sm:mb-16 pb-10 border-b border-divider" dir="rtl" aria-label="פרטי המתחם">
+          <div className="grid grid-cols-3">
+            <div className="pl-4 sm:pl-6 [&:not(:last-child)]:border-l [&:not(:last-child)]:border-divider/70">
+              <div className="label-airy text-[9px] sm:text-[10px] text-muted mb-2">אורחים</div>
+              <div className="font-editorial text-charcoal text-2xl sm:text-4xl leading-none">
+                {compound.capacity}
+              </div>
+            </div>
+            <div className="px-4 sm:px-6 [&:not(:last-child)]:border-l [&:not(:last-child)]:border-divider/70">
+              <div className="label-airy text-[9px] sm:text-[10px] text-muted mb-2">חדרים</div>
+              <div className="font-editorial text-charcoal text-2xl sm:text-4xl leading-none">
+                {compound.rooms.length}
+              </div>
+            </div>
+            <div className="pr-4 sm:pr-6">
+              <div className="label-airy text-[9px] sm:text-[10px] text-muted mb-2">לילה</div>
+              <div className="font-editorial text-charcoal text-2xl sm:text-4xl leading-none tabular-nums">
+                ₪{parseFloat(compound.weekdayPrice).toLocaleString()}
+              </div>
+            </div>
+          </div>
+
           {compound.videoUrl && (
             <a
               href={compound.videoUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-neutral-900 text-white text-sm font-medium rounded-full hover:bg-neutral-700 transition-colors"
+              className="group inline-flex items-center gap-2.5 mt-8 text-charcoal-soft hover:text-charcoal transition-colors"
             >
-              <PlayCircle className="w-4 h-4" aria-hidden="true" />
-              צפייה בסרטון המתחם
+              <PlayCircle className="w-4 h-4 text-gold" aria-hidden="true" />
+              <span className="label-airy text-[10px] sm:text-xs border-b border-gold/40 group-hover:border-gold pb-px transition-colors">
+                צפייה בסרטון
+              </span>
             </a>
           )}
-        </div>
+        </section>
 
-        {/* Yard images - horizontal swipe carousel */}
+        {/* Yard section */}
         {yardImages.length > 0 && (
-          <div className="relative">
-            <div
-              className="flex gap-2 overflow-x-auto snap-x snap-mandatory pb-2 -mx-3 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8"
-              style={{ scrollbarWidth: 'thin' }}
-            >
-              {yardImages.map((img, imgIdx) => (
-                <div
-                  key={img.id}
-                  onClick={() => setLightbox(imgIdx)}
-                  className="cursor-pointer overflow-hidden rounded-xl flex-shrink-0 snap-start"
-                  style={{
-                    width: 'min(85vw, 720px)',
-                    maxWidth: '720px',
-                  }}
-                >
-                  <img
-                    src={img.url}
-                    alt={`${compound.name} ${imgIdx + 1}`}
-                    className="w-full h-56 sm:h-[420px] lg:h-[480px] object-cover hover:scale-[1.02] transition-transform duration-500 ease-out"
-                    loading="lazy"
-                  />
-                </div>
-              ))}
-            </div>
-            {/* Counter badge */}
-            <div className="absolute bottom-4 left-4 bg-black/60 text-white text-xs font-medium px-3 py-1.5 rounded-full pointer-events-none">
-              {yardImages.length} תמונות · החלק לצדדים
-            </div>
-          </div>
+          <SectionBlock
+            sectionIdx={1}
+            title="החצר"
+            count={yardImages.length}
+            showIndex={showIndex}
+            dir="rtl"
+          >
+            <ImageRow
+              images={yardImages}
+              baseIdx={0}
+              tileClass="w-[min(85vw,720px)] aspect-[3/2]"
+              compoundName={compound.name}
+              onOpen={setLightbox}
+            />
+          </SectionBlock>
         )}
 
         {/* Room sections */}
-        {compound.rooms
-          .filter((room) => (room.images || []).length > 0)
-          .map((room) => {
-            const yardCount = yardImages.length
-            const roomsWithImages = compound.rooms.filter((r) => (r.images || []).length > 0)
-            const roomIdx = roomsWithImages.indexOf(room)
-            const roomStartIdx =
-              yardCount +
-              roomsWithImages
-                .slice(0, roomIdx)
-                .reduce((acc, r) => acc + (r.images || []).length, 0)
+        {roomsWithImages.map((room, roomIdx) => {
+          const yardCount = yardImages.length
+          const roomStartIdx =
+            yardCount +
+            roomsWithImages
+              .slice(0, roomIdx)
+              .reduce((acc, r) => acc + (r.images || []).length, 0)
+          const sectionIdx = (yardImages.length > 0 ? 1 : 0) + roomIdx + 1
 
-            return (
-              <div key={room.id} className="mt-6">
-                <h3 className="text-base font-semibold text-neutral-700 mb-2" dir="rtl">
-                  {room.name}
-                  {room.capacity && (
-                    <span className="text-sm font-normal text-neutral-400 mr-2">
-                      (עד {room.capacity} אורחים)
-                    </span>
-                  )}
-                </h3>
-
-                <div className="relative">
-                  <div className="flex gap-2 overflow-x-auto pb-2 snap-x snap-mandatory" dir="rtl" style={{ scrollbarWidth: 'thin' }}>
-                    {(room.images || []).map((img, imgIdx) => (
-                      <div
-                        key={img.id}
-                        onClick={() => setLightbox(roomStartIdx + imgIdx)}
-                        className="cursor-pointer overflow-hidden rounded-xl shrink-0 snap-start w-64 sm:w-72 lg:w-80"
-                      >
-                        <img
-                          src={img.url}
-                          alt={`${room.name} ${imgIdx + 1}`}
-                          className="w-full h-44 sm:h-52 lg:h-56 object-cover hover:scale-[1.03] transition-transform duration-500 ease-out"
-                          loading="lazy"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  {(room.images || []).length > 1 && (
-                    <div className="absolute bottom-4 left-4 bg-black/60 text-white text-xs font-medium px-3 py-1.5 rounded-full pointer-events-none">
-                      {(room.images || []).length} תמונות · החלק לצדדים
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          })}
+          return (
+            <SectionBlock
+              key={room.id}
+              sectionIdx={sectionIdx}
+              title={room.name}
+              count={(room.images || []).length}
+              capacity={room.capacity}
+              showIndex={showIndex}
+              dir="rtl"
+            >
+              <ImageRow
+                images={room.images || []}
+                baseIdx={roomStartIdx}
+                tileClass="w-64 sm:w-80 lg:w-96 aspect-[4/3]"
+                compoundName={room.name}
+                onOpen={setLightbox}
+              />
+            </SectionBlock>
+          )
+        })}
       </div>
 
       {/* Lightbox */}
       {lightbox !== null && (
         <div
-          className="fixed inset-0 z-[100] bg-black flex items-center justify-center"
+          className="fixed inset-0 z-[100] bg-charcoal flex items-center justify-center"
           onClick={closeLightbox}
+          role="dialog"
+          aria-modal="true"
+          aria-label="גלריית תמונות מוגדלת"
         >
-          <button
-            onClick={closeLightbox}
-            aria-label="סגור גלריה"
-            className="absolute top-4 left-4 sm:top-6 sm:left-6 text-white/60 hover:text-white transition-colors z-10 p-2"
+          {/* Top bar — close + fraction */}
+          <div
+            className="absolute top-0 inset-x-0 flex items-center justify-between px-5 py-5 sm:px-10 sm:py-7 z-10"
+            dir="rtl"
+            onClick={(e) => e.stopPropagation()}
           >
-            <X className="w-6 h-6" aria-hidden="true" />
-          </button>
+            <button
+              onClick={closeLightbox}
+              aria-label="סגור גלריה"
+              className="text-bone/60 hover:text-bone transition-colors p-2 -m-2"
+            >
+              <X className="w-6 h-6" aria-hidden="true" />
+            </button>
+            <span className="label-airy text-bone/70 text-xs sm:text-sm tabular-nums">
+              {pad2(lightbox + 1)} / {pad2(allImages.length)}
+            </span>
+          </div>
 
           <button
             onClick={(e) => {
               e.stopPropagation()
               nextImage()
             }}
-            className="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors z-10 p-2"
+            aria-label="תמונה הבאה"
+            className="absolute right-3 sm:right-10 top-1/2 -translate-y-1/2 text-bone/40 hover:text-bone transition-colors p-3 z-10"
           >
-            <ChevronRight className="w-8 h-8 sm:w-10 sm:h-10" />
+            <ChevronRight className="w-7 h-7 sm:w-9 sm:h-9" />
           </button>
 
           <button
@@ -244,23 +268,179 @@ export default function Gallery({ compoundId }: Props) {
               e.stopPropagation()
               prevImage()
             }}
-            className="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors z-10 p-2"
+            aria-label="תמונה קודמת"
+            className="absolute left-3 sm:left-10 top-1/2 -translate-y-1/2 text-bone/40 hover:text-bone transition-colors p-3 z-10"
           >
-            <ChevronLeft className="w-8 h-8 sm:w-10 sm:h-10" aria-hidden="true" />
+            <ChevronLeft className="w-7 h-7 sm:w-9 sm:h-9" aria-hidden="true" />
           </button>
 
           <img
             src={allImages[lightbox]}
             alt={`${compound?.name || 'מתחם'} - תמונה ${lightbox + 1} מתוך ${allImages.length}`}
-            className="max-h-[80vh] max-w-[95vw] sm:max-w-[85vw] object-contain"
+            className="max-h-[78vh] max-w-[92vw] sm:max-w-[82vw] object-contain"
             onClick={(e) => e.stopPropagation()}
           />
 
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/50 text-sm">
-            {lightbox + 1} / {allImages.length}
+          {/* Bottom caption */}
+          <div
+            className="absolute bottom-6 sm:bottom-8 inset-x-0 text-center pointer-events-none"
+            dir="rtl"
+          >
+            <div className="w-6 h-px bg-gold/70 mx-auto mb-3" />
+            <span className="label-airy text-bone/55 text-[10px] sm:text-xs">
+              {compound?.name}
+            </span>
           </div>
         </div>
       )}
     </>
+  )
+}
+
+/* ---- Section header + image row helpers ---- */
+
+interface SectionBlockProps {
+  sectionIdx: number
+  title: string
+  count: number
+  capacity?: number
+  showIndex: boolean
+  dir?: 'rtl' | 'ltr'
+  children: ReactNode
+}
+
+function SectionBlock({
+  sectionIdx,
+  title,
+  count,
+  capacity,
+  showIndex,
+  dir = 'rtl',
+  children,
+}: SectionBlockProps) {
+  return (
+    <section className="mt-14 sm:mt-20 first:mt-0" dir={dir} aria-label={title}>
+      <header className="flex items-baseline justify-between mb-3">
+        <div className="flex items-baseline gap-3">
+          <h2 className="font-editorial text-2xl sm:text-4xl text-charcoal leading-none">
+            {title}
+          </h2>
+          {capacity && (
+            <span className="label-airy text-[9px] sm:text-[10px] text-muted">
+              עד {capacity} אורחים
+            </span>
+          )}
+        </div>
+        {showIndex && (
+          <span className="label-airy text-[10px] sm:text-xs text-muted tabular-nums">
+            פרק {pad2(sectionIdx)}
+          </span>
+        )}
+      </header>
+      <div className="flex items-center gap-3 mb-6">
+        <span className="block w-8 h-px bg-gold" />
+        <span className="label-airy text-[9px] sm:text-[10px] text-muted/80 tabular-nums">
+          {pad2(count)} תמונות
+        </span>
+      </div>
+      {children}
+    </section>
+  )
+}
+
+interface ImageRowProps {
+  images: CompoundImage[]
+  baseIdx: number
+  tileClass: string
+  compoundName: string
+  onOpen: (idx: number) => void
+}
+
+function ImageRow({ images, baseIdx, tileClass, compoundName, onOpen }: ImageRowProps) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [edges, setEdges] = useState({ atStart: true, atEnd: true })
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const update = () => {
+      const { scrollLeft, scrollWidth, clientWidth } = el
+      if (scrollWidth <= clientWidth + 1) {
+        setEdges({ atStart: true, atEnd: true })
+        return
+      }
+      // In RTL Chrome: scrollLeft is 0 at start, goes negative toward end
+      const atStart = scrollLeft >= -1
+      const atEnd = Math.abs(scrollLeft) >= scrollWidth - clientWidth - 1
+      setEdges({ atStart, atEnd })
+    }
+    update()
+    const timer = window.setTimeout(update, 400) // re-measure after images settle
+    el.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', update)
+    return () => {
+      window.clearTimeout(timer)
+      el.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+    }
+  }, [images.length])
+
+  function scrollByDir(direction: 'next' | 'prev') {
+    const el = scrollRef.current
+    if (!el) return
+    const delta = el.clientWidth * 0.85
+    // RTL: 'next' (visually leftward) needs negative scrollLeft delta
+    el.scrollBy({ left: direction === 'next' ? -delta : delta, behavior: 'smooth' })
+  }
+
+  return (
+    <div className="relative group/row">
+      <div
+        ref={scrollRef}
+        className="flex gap-3 sm:gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-5 sm:-mx-8 lg:-mx-10 px-5 sm:px-8 lg:px-10 no-scrollbar"
+        dir="rtl"
+      >
+        {images.map((img, imgIdx) => (
+          <button
+            key={img.id}
+            type="button"
+            onClick={() => onOpen(baseIdx + imgIdx)}
+            aria-label={`הגדל תמונה ${imgIdx + 1}`}
+            className={`group/tile relative overflow-hidden flex-shrink-0 snap-start ${tileClass}`}
+          >
+            <img
+              src={img.url}
+              alt={`${compoundName} ${imgIdx + 1}`}
+              className="w-full h-full object-cover transition-transform duration-[600ms] ease-out group-hover/tile:scale-[1.02]"
+              loading="lazy"
+            />
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gold scale-x-0 origin-right group-hover/tile:scale-x-100 transition-transform duration-500 ease-out"
+            />
+          </button>
+        ))}
+      </div>
+
+      {/* Desktop hover arrows — appear on row hover, fade at edges */}
+      <button
+        type="button"
+        onClick={() => scrollByDir('next')}
+        aria-label="תמונה הבאה"
+        disabled={edges.atEnd}
+        className="hidden md:flex absolute left-3 top-1/2 -translate-y-1/2 z-10 w-11 h-11 rounded-full bg-bone/95 backdrop-blur-sm border border-divider items-center justify-center text-charcoal-soft hover:text-charcoal hover:border-gold hover:shadow-[0_6px_16px_-4px_rgba(26,26,24,0.18)] transition-all duration-200 opacity-0 group-hover/row:opacity-100 disabled:opacity-0 disabled:pointer-events-none"
+      >
+        <ChevronLeft className="w-4 h-4" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        onClick={() => scrollByDir('prev')}
+        aria-label="תמונה קודמת"
+        disabled={edges.atStart}
+        className="hidden md:flex absolute right-3 top-1/2 -translate-y-1/2 z-10 w-11 h-11 rounded-full bg-bone/95 backdrop-blur-sm border border-divider items-center justify-center text-charcoal-soft hover:text-charcoal hover:border-gold hover:shadow-[0_6px_16px_-4px_rgba(26,26,24,0.18)] transition-all duration-200 opacity-0 group-hover/row:opacity-100 disabled:opacity-0 disabled:pointer-events-none"
+      >
+        <ChevronRight className="w-4 h-4" aria-hidden="true" />
+      </button>
+    </div>
   )
 }

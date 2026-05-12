@@ -70,6 +70,14 @@ const bookingLimit = createRateLimit({
   message: 'יותר מדי בקשות הזמנה. נסה שוב בעוד שעה.',
 });
 
+// Refresh token endpoint: bound but lenient (legitimate clients may refresh often).
+// Without this, a stolen refresh token can be brute-forced indefinitely.
+const refreshLimit = createRateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30,                   // 30 refreshes per 15min per IP
+  message: 'יותר מדי ניסיונות רענון. נסה שוב בעוד מעט.',
+});
+
 /**
  * AI agent has TWO windows: 30/5min (burst) AND 1500/day (cost cap).
  * Use both as a chain.
@@ -86,4 +94,4 @@ const agentDaily = createRateLimit({
 });
 const rateLimitAgent = [agentBurst, agentDaily];
 
-module.exports = { createRateLimit, authLimit, contactLimit, bookingLimit, rateLimitAgent };
+module.exports = { createRateLimit, authLimit, contactLimit, bookingLimit, refreshLimit, rateLimitAgent };

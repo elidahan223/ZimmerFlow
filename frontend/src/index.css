@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+/* Boutique Minimal palette — exact tokens from designer spec */
+@theme {
+  --color-charcoal: #1A1A18;
+  --color-charcoal-soft: #3C3B35;
+  --color-gold: #B5A58A;
+  --color-bone: #FBF8F3;
+  --color-divider: #E0D9CE;
+  --color-muted: #7A7569;
+  --color-green-accent: #6B8F5E;
+
+  --font-heading: "Frank Ruhl Libre", "Heebo", serif;
+  --font-body: "Heebo", "Frank Ruhl Libre", sans-serif;
+  --font-accent: "Playfair Display", "Frank Ruhl Libre", serif;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -14,9 +29,31 @@ html {
 
 body {
   font-family: "Heebo", sans-serif;
-  color: #1a1a1a;
-  background-color: #fff;
+  font-weight: 300;
+  color: #1A1A18;
+  background-color: #FBF8F3;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Editorial heading utility - Frank Ruhl Libre weight 900 */
+.font-editorial {
+  font-family: "Frank Ruhl Libre", serif;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+/* Latin accent utility - Playfair italic */
+.font-accent-italic {
+  font-family: "Playfair Display", serif;
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* Wide-spaced label - the "air" trick for mobile */
+.label-airy {
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 400;
 }
 
 /* Hide scrollbar but keep scrolling */

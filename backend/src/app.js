@@ -84,7 +84,25 @@ const server = app.listen(PORT, () => {
   console.log(`ZimmerFlow server running on port ${PORT}`);
 });
 
-// Keep process alive
-process.on('SIGTERM', () => server.close());
+// Graceful shutdown: close HTTP server, then drain Prisma connection pool.
+// Without disconnecting Prisma, the postgres pool can leak on container restarts.
+const prisma = require('./config/database');
+
+async function shutdown(signal) {
+  console.log(`\n[${signal}] shutting down gracefully...`);
+  server.close(async () => {
+    try {
+      await prisma.$disconnect();
+    } catch (e) {
+      console.error('Error disconnecting Prisma:', e.message);
+    }
+    process.exit(0);
+  });
+  // Force exit after 10s if shutdown hangs
+  setTimeout(() => process.exit(1), 10_000).unref();
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 module.exports = app;

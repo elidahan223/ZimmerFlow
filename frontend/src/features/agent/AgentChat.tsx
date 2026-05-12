@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { MessageCircle, X, Send, Loader2, FileSignature } from 'lucide-react'
+import { X, Send, FileSignature } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import BookingRequestModal, { type BookingInitialValues } from '../booking/BookingRequestModal'
 
@@ -29,6 +29,26 @@ interface Props {
   compoundName?: string
 }
 
+const SUGGESTED_PROMPTS = [
+  'בדיקת זמינות',
+  'מחיר ללילה',
+  'מה כולל המתחם?',
+  'פתח לי הזמנה',
+]
+
+function BrandAvatar({ size = 'md', ring = 'divider' }: { size?: 'sm' | 'md'; ring?: 'divider' | 'gold' | 'bone' }) {
+  const dim = size === 'sm' ? 'w-12 h-12' : 'w-14 h-14'
+  const ringClass =
+    ring === 'gold' ? 'border-gold/70' : ring === 'bone' ? 'border-bone/30' : 'border-divider'
+  return (
+    <div className={`relative ${dim} shrink-0`}>
+      <div className={`absolute inset-0 rounded-full border ${ringClass} bg-bone overflow-hidden flex items-center justify-center`}>
+        <img src="/agent-logo.png" alt="" className="w-full h-full object-contain" />
+      </div>
+    </div>
+  )
+}
+
 export default function AgentChat({ compoundId, compoundName }: Props) {
   const auth = useAuth()
   const [open, setOpen] = useState(false)
@@ -40,7 +60,7 @@ export default function AgentChat({ compoundId, compoundName }: Props) {
   const [display, setDisplay] = useState<DisplayMessage[]>([
     {
       role: 'assistant',
-      text: `שלום! 👋 אני **אקי** - הסוכן הוירטואלי של${compoundName ? ' ' + compoundName : ' המתחם'}. אני מכיר את כל המתחם לעומק - חדרים, מחירים, כללים, סביבה - ואני זמין כדי לעזור לך לבדוק זמינות, להבין על המקום ולפתוח הזמנה. במה אוכל לעזור? 😊`,
+      text: `שלום, אני העוזר של ${compoundName || 'המתחם'} — מכיר את החדרים, המחירים והסביבה. במה אפשר לעזור?`,
     },
   ])
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -63,11 +83,11 @@ export default function AgentChat({ compoundId, compoundName }: Props) {
     }
   }, [display, loading])
 
-  async function send() {
-    const text = input.trim()
+  async function send(overrideText?: string) {
+    const text = (overrideText ?? input).trim()
     if (!text || loading) return
 
-    setInput('')
+    if (!overrideText) setInput('')
     setDisplay((prev) => [...prev, { role: 'user', text }])
     setLoading(true)
 
@@ -113,112 +133,161 @@ export default function AgentChat({ compoundId, compoundName }: Props) {
     }
   }
 
+  const showChips = display.length === 1 && !loading
+
   return (
     <>
-      {/* Floating bubble - "אקי" agent */}
+      {/* Floating bubble — editorial concierge */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          aria-label="פתח צ'אט עם אקי - הסוכן הוירטואלי"
-          className="fixed bottom-24 sm:bottom-6 left-4 sm:left-6 z-[60] flex items-center gap-3 bg-gradient-to-l from-neutral-900 to-neutral-700 text-white rounded-full pr-5 pl-3 py-3 shadow-2xl hover:shadow-emerald-500/20 hover:scale-105 transition-all"
+          aria-label="פתח צ'אט עם העוזר הוירטואלי"
+          className="group fixed bottom-24 sm:bottom-6 left-4 sm:left-6 z-[60] flex items-center gap-3 bg-charcoal text-bone pr-2 pl-5 py-2 rounded-full shadow-[0_8px_24px_-8px_rgba(26,26,24,0.45)] hover:bg-charcoal-soft transition-all duration-300"
           dir="rtl"
         >
-          <div className="text-right">
-            <div className="font-bold text-sm leading-tight">אקי - שאל אותי הכל</div>
-            <div className="text-[11px] text-neutral-300 leading-tight">מכיר את כל המתחם · זמין 24/7</div>
+          <div className="relative w-12 h-12 shrink-0">
+            <div className="absolute inset-0 rounded-full border border-gold/70 bg-bone overflow-hidden flex items-center justify-center">
+              <img src="/agent-logo.png" alt="" className="w-full h-full object-contain" />
+            </div>
+            <span
+              className="absolute bottom-0 right-0 w-2 h-2 bg-green-accent rounded-full ring-2 ring-charcoal"
+              aria-hidden="true"
+            />
           </div>
-          <div className="relative w-11 h-11 bg-white/10 rounded-full flex items-center justify-center shrink-0">
-            <MessageCircle className="w-5 h-5" aria-hidden="true" />
-            <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full ring-2 ring-neutral-800" aria-hidden="true" />
+          <div className="text-right">
+            <div className="font-editorial text-sm leading-none">העוזר</div>
+            <div className="label-airy text-[9px] text-bone/55 leading-none mt-1">CONCIERGE</div>
           </div>
         </button>
       )}
 
-      {/* Chat window */}
+      {/* Chat panel */}
       {open && (
         <div
-          className="fixed bottom-6 left-6 right-6 sm:right-auto sm:w-96 z-[60] bg-white rounded-2xl shadow-2xl border border-neutral-200 flex flex-col"
-          style={{ maxHeight: 'min(600px, calc(100vh - 100px))', height: '600px' }}
+          className="fixed z-[60] flex flex-col overflow-hidden bg-bone border border-divider rounded-2xl shadow-[0_24px_48px_-16px_rgba(26,26,24,0.25)]
+                     inset-x-4 bottom-24
+                     sm:inset-x-auto sm:left-6 sm:right-auto sm:bottom-6 sm:w-[400px]
+                     h-[520px] sm:h-[600px] max-h-[calc(100dvh-140px)]"
           dir="rtl"
+          role="dialog"
+          aria-modal="true"
+          aria-label="צ'אט עם העוזר הוירטואלי"
         >
+          {/* Top accent — thin gold rule */}
+          <div className="h-px bg-gradient-to-l from-transparent via-gold/60 to-transparent" />
+
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
+          <header className="flex items-center justify-between px-4 py-4 border-b border-divider/70 bg-bone">
             <div className="flex items-center gap-3">
-              <div className="relative w-10 h-10 bg-gradient-to-br from-neutral-800 to-neutral-600 rounded-full flex items-center justify-center text-white font-bold">
-                א
-                <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full ring-2 ring-white" aria-hidden="true" />
+              <div className="relative">
+                <BrandAvatar size="md" ring="divider" />
+                <span
+                  className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-accent rounded-full ring-2 ring-bone"
+                  aria-hidden="true"
+                />
               </div>
-              <div>
-                <h3 className="font-bold text-neutral-900 leading-tight">אקי</h3>
-                <p className="text-xs text-emerald-600 leading-tight font-medium">● זמין · מכיר את כל המתחם</p>
+              <div className="flex flex-col">
+                <span className="label-airy text-[9px] text-muted leading-none mb-1.5">CONCIERGE</span>
+                <h3 className="font-editorial text-charcoal leading-none text-base">העוזר</h3>
               </div>
             </div>
             <button
               onClick={() => setOpen(false)}
               aria-label="סגור צ'אט"
-              className="text-neutral-400 hover:text-neutral-700 transition-colors p-1"
+              className="text-muted hover:text-charcoal transition-colors p-2 -m-2"
             >
-              <X className="w-5 h-5" aria-hidden="true" />
+              <X className="w-4 h-4" aria-hidden="true" />
             </button>
-          </div>
+          </header>
 
           {/* Messages */}
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5 space-y-3.5 bg-bone">
             {display.map((msg, i) => (
               <div
                 key={i}
                 className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}
               >
                 <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap ${
+                  className={`max-w-[80%] px-4 py-2.5 text-[13.5px] leading-[1.55] whitespace-pre-wrap ${
                     msg.role === 'user'
-                      ? 'bg-neutral-900 text-white rounded-br-sm'
-                      : 'bg-neutral-100 text-neutral-800 rounded-bl-sm'
+                      ? 'bg-charcoal text-bone rounded-2xl rounded-br-md shadow-[0_1px_2px_rgba(26,26,24,0.15)]'
+                      : 'bg-white text-charcoal rounded-2xl rounded-bl-md shadow-[0_1px_2px_rgba(26,26,24,0.04)]'
                   }`}
                 >
                   {msg.text}
                 </div>
               </div>
             ))}
+
+            {/* Suggested prompts — shown only on first message */}
+            {showChips && (
+              <div className="pt-2 pb-1">
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <span className="block w-5 h-px bg-gold/70" />
+                  <span className="label-airy text-[9px] text-muted">הצעות</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {SUGGESTED_PROMPTS.map((prompt) => (
+                    <button
+                      key={prompt}
+                      onClick={() => send(prompt)}
+                      className="text-[12.5px] text-charcoal-soft bg-white border border-divider rounded-full px-3.5 py-1.5 hover:border-gold hover:text-charcoal hover:shadow-[0_2px_6px_rgba(181,165,138,0.18)] transition-all duration-200"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {loading && (
               <div className="flex justify-end">
-                <div className="bg-neutral-100 rounded-2xl rounded-bl-sm px-4 py-3">
-                  <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
+                <div className="bg-white rounded-2xl rounded-bl-md px-4 py-3 shadow-[0_1px_2px_rgba(26,26,24,0.04)]">
+                  <div className="flex gap-1 items-center">
+                    {[0, 1, 2].map((i) => (
+                      <span
+                        key={i}
+                        className="w-1.5 h-1.5 bg-muted/70 rounded-full animate-pulse"
+                        style={{ animationDelay: `${i * 180}ms`, animationDuration: '1.2s' }}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Sign CTA - appears after agent calls propose_booking */}
+          {/* Sign CTA */}
           {proposed && !showSignModal && (
-            <div className="border-t border-neutral-100 px-3 pt-3">
+            <div className="border-t border-divider/70 bg-bone px-3 pt-3">
               <button
                 onClick={() => setShowSignModal(true)}
-                className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white text-sm font-semibold py-3 rounded-xl hover:bg-emerald-700 transition-colors shadow-sm"
+                className="w-full flex items-center justify-center gap-2 bg-green-accent text-bone text-sm font-medium py-3 rounded-xl hover:opacity-90 transition-opacity"
               >
-                <FileSignature className="w-4 h-4" />
+                <FileSignature className="w-4 h-4" aria-hidden="true" />
                 המשך לחתימה
               </button>
             </div>
           )}
 
           {/* Input */}
-          <div className="border-t border-neutral-100 p-3">
+          <div className="border-t border-divider/70 bg-bone p-3">
             <div className="flex gap-2 items-end">
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKey}
-                placeholder="שאל את אקי..."
+                placeholder="שאל את העוזר..."
                 rows={1}
-                className="flex-1 resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm focus:outline-none focus:border-neutral-400 max-h-24"
+                aria-label="הקלד הודעה לעוזר"
+                className="flex-1 resize-none rounded-xl border border-divider bg-white px-3.5 py-2.5 text-[13.5px] text-charcoal placeholder:text-muted/60 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold/30 max-h-24 transition-colors"
                 disabled={loading}
               />
               <button
-                onClick={send}
+                onClick={() => send()}
                 disabled={loading || !input.trim()}
                 aria-label="שלח הודעה"
-                className="bg-neutral-900 text-white rounded-xl p-2.5 hover:bg-neutral-700 transition-colors disabled:opacity-40"
+                className="bg-charcoal text-bone rounded-xl p-2.5 hover:bg-charcoal-soft transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Send className="w-4 h-4" aria-hidden="true" />
               </button>
