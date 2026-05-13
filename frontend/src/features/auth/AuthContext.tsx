@@ -32,23 +32,23 @@ interface AuthContextType {
   isAuthenticated: boolean
   isOwner: boolean
   isLoading: boolean
-  login: (phone: string, password: string) => Promise<void>
-  signup: (data: SignupData) => Promise<{ needsConfirmation: boolean; phone: string }>
-  confirmCode: (phone: string, code: string) => Promise<void>
+  login: (email: string, password: string) => Promise<void>
+  signup: (data: SignupData) => Promise<{ needsConfirmation: boolean; email: string }>
+  confirmCode: (email: string, code: string) => Promise<void>
   logout: () => void
   getValidToken: () => Promise<string>
   refreshProfile: () => Promise<void>
   showAuth: 'login' | 'signup' | 'confirm' | null
   setShowAuth: (v: 'login' | 'signup' | 'confirm' | null) => void
-  pendingPhone: string
-  setPendingPhone: (v: string) => void
+  pendingEmail: string
+  setPendingEmail: (v: string) => void
 }
 
 interface SignupData {
   firstName: string
   lastName: string
-  email?: string
-  phone: string
+  email: string
+  phone?: string
   password: string
   idNumber?: string
   address?: string
@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [showAuth, setShowAuth] = useState<'login' | 'signup' | 'confirm' | null>(null)
-  const [pendingPhone, setPendingPhone] = useState('')
+  const [pendingEmail, setPendingEmail] = useState('')
 
   useEffect(() => {
     const stored = localStorage.getItem('zimmerflow_auth')
@@ -103,11 +103,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {}
   }
 
-  const login = async (phone: string, password: string) => {
+  const login = async (email: string, password: string) => {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, password }),
+      body: JSON.stringify({ email, password }),
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.error)
@@ -118,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       accessToken: data.accessToken,
       idToken: data.idToken,
       refreshToken: data.refreshToken,
+      email: email.trim().toLowerCase(),
     }
     setUser(userData)
     localStorage.setItem('zimmerflow_auth', JSON.stringify(userData))
@@ -134,16 +135,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!res.ok) throw new Error(result.error)
 
     return {
-      needsConfirmation: result.needsConfirmation,
-      phone: data.phone,
+      needsConfirmation: !!result.needsConfirmation,
+      email: data.email,
     }
   }
 
-  const confirmCode = async (phone: string, code: string) => {
+  const confirmCode = async (email: string, code: string) => {
     const res = await fetch('/api/auth/confirm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, code }),
+      body: JSON.stringify({ email, code }),
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.error)
@@ -155,7 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await fetch('/api/auth/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: user.refreshToken }),
+        body: JSON.stringify({ refreshToken: user.refreshToken, email: user.email }),
       })
       if (!res.ok) {
         logout()
@@ -214,8 +215,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshProfile: fetchProfile,
       showAuth,
       setShowAuth,
-      pendingPhone,
-      setPendingPhone,
+      pendingEmail,
+      setPendingEmail,
     }}>
       {children}
     </AuthContext.Provider>

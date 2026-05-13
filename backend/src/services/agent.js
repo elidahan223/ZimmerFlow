@@ -118,7 +118,7 @@ const TOOLS = [
   },
   {
     name: 'propose_booking',
-    description: 'מציע ללקוח לסיים את ההזמנה במסך החתימה - לא יוצר הזמנה ב-DB. השתמש בכלי הזה אחרי שאספת את כל הפרטים ובדקת זמינות. הוא יחזיר חזרה ללקוח כפתור "המשך לחתימה" שיפתח חוזה דיגיטלי. ההזמנה תיווצר רק אחרי שהלקוח חותם.',
+    description: 'מציע ללקוח לסיים את ההזמנה במסך החתימה - לא יוצר הזמנה ב-DB. השתמש בכלי הזה אחרי שאספת את כל הפרטים ובדקת זמינות. הוא יחזיר חזרה ללקוח כפתור "המשך לחתימה" שיפתח חוזה דיגיטלי. ההזמנה תיווצר רק אחרי שהלקוח חותם. **אם הלקוח רוצה את כל המתחם יחד (עליון + תחתון) — העבר book_all_compounds=true**.',
     input_schema: {
       type: 'object',
       properties: {
@@ -127,33 +127,51 @@ const TOOLS = [
         guests_count: { type: 'integer', description: 'מספר אורחים סה"כ' },
         adults: { type: 'integer', description: 'מבוגרים (אם ידוע, אחרת השתמש ב-guests_count)' },
         children: { type: 'integer', description: 'ילדים (אופציונלי)' },
-        room_ids: { type: 'array', items: { type: 'string' }, description: 'רשימת ID של חדרים שהלקוח בחר במתחם (אופציונלי)' },
+        room_ids: { type: 'array', items: { type: 'string' }, description: 'רשימת ID של חדרים שהלקוח בחר במתחם (אופציונלי, רק כשמזמינים מתחם בודד)' },
         notes: { type: 'string', description: 'הערות מיוחדות מהלקוח (אופציונלי)' },
+        book_all_compounds: { type: 'boolean', description: 'true אם הלקוח רוצה להזמין את כל המתחמים יחד (עליון+תחתון). אחרת השמט או false.' },
       },
       required: ['check_in', 'check_out', 'guests_count'],
     },
   },
 ];
 
-async function proposeBooking({ compoundId, check_in, check_out, guests_count, adults, children, room_ids, notes }) {
-  // Validate dates and availability one more time before proposing
+async function proposeBooking({ compoundId, check_in, check_out, guests_count, adults, children, room_ids, notes, book_all_compounds }) {
   if (!check_in || !check_out) return { error: 'חסרים תאריכים' };
-  const availability = await checkAvailability({ compoundId, check_in, check_out });
-  if (availability.error) return availability;
-  if (!availability.available) {
-    return { error: 'התאריכים שביקשת אינם זמינים', conflicting_dates: availability.conflicting_dates };
+
+  // Determine target compounds: either all (when user wants full property), or just the current one.
+  let compoundIds;
+  if (book_all_compounds) {
+    const all = await prisma.compound.findMany({ select: { id: true, name: true } });
+    if (!all.length) return { error: 'לא נמצאו מתחמים במערכת' };
+    compoundIds = all.map((c) => c.id);
+  } else {
+    compoundIds = [compoundId];
+  }
+
+  // Check availability across every selected compound — fail fast if any conflicts.
+  for (const cid of compoundIds) {
+    const availability = await checkAvailability({ compoundId: cid, check_in, check_out });
+    if (availability.error) return availability;
+    if (!availability.available) {
+      return {
+        error: 'התאריכים שביקשת אינם זמינים באחד המתחמים',
+        conflicting_dates: availability.conflicting_dates,
+      };
+    }
   }
 
   return {
     ok: true,
     proposal: {
-      compoundId,
+      compoundIds,
       checkIn: check_in,
       checkOut: check_out,
       guestsCount: parseInt(guests_count) || 2,
       adults: adults != null ? parseInt(adults) : null,
       children: children != null ? parseInt(children) : null,
-      roomIds: Array.isArray(room_ids) ? room_ids : [],
+      // Room selection only applies to single-compound bookings.
+      roomIds: book_all_compounds ? [] : (Array.isArray(room_ids) ? room_ids : []),
       notes: notes || '',
     },
     next_step: 'הצג ללקוח שהפרטים מאושרים ואמור לו ללחוץ על הכפתור "המשך לחתימה" שמופיע במסך כדי לחתום על החוזה ולסיים את ההזמנה.',

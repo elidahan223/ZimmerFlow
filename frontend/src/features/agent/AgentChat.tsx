@@ -14,7 +14,7 @@ interface DisplayMessage {
 }
 
 interface ProposedBooking {
-  compoundId: string
+  compoundIds: string[]
   checkIn: string
   checkOut: string
   guestsCount: number
@@ -67,7 +67,7 @@ export default function AgentChat({ compoundId, compoundName }: Props) {
 
   const initialValues: BookingInitialValues | undefined = proposed
     ? {
-        compoundIds: [proposed.compoundId],
+        compoundIds: proposed.compoundIds,
         roomIds: proposed.roomIds,
         checkIn: proposed.checkIn,
         checkOut: proposed.checkOut,

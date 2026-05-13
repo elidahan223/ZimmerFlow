@@ -27,7 +27,7 @@ export default function AuthModal() {
 
 function LoginForm() {
   const auth = useAuth()
-  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [error, setError] = useState('')
@@ -38,7 +38,7 @@ function LoginForm() {
     setError('')
     setLoading(true)
     try {
-      await auth.login(phone, password)
+      await auth.login(email, password)
     } catch (err: any) {
       setError(err.message || 'שגיאה בהתחברות')
     } finally {
@@ -53,14 +53,15 @@ function LoginForm() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-1">טלפון</label>
+          <label className="block text-sm font-medium text-neutral-700 mb-1">מייל</label>
           <input
-            type="tel"
+            type="email"
+            autoComplete="email"
             required
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             className={inputClass}
-            placeholder="050-0000000"
+            placeholder="your@email.com"
             dir="ltr"
           />
         </div>
@@ -133,10 +134,10 @@ function SignupForm() {
     try {
       const result = await auth.signup(form)
       if (result.needsConfirmation) {
-        auth.setPendingPhone(form.phone)
+        auth.setPendingEmail(form.email)
         auth.setShowAuth('confirm')
       } else {
-        await auth.login(form.phone, form.password)
+        await auth.login(form.email, form.password)
       }
     } catch (err: any) {
       setError(err.message || 'שגיאה ברישום')
@@ -214,9 +215,11 @@ function SignupForm() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-1">אימייל</label>
+          <label className="block text-sm font-medium text-neutral-700 mb-1">אימייל *</label>
           <input
             type="email"
+            autoComplete="email"
+            required
             value={form.email}
             onChange={(e) => set('email', e.target.value)}
             className={inputClass}
@@ -252,7 +255,7 @@ function SignupForm() {
 
         <button
           type="submit"
-          disabled={loading || !form.firstName || !form.lastName || !form.phone || !form.password}
+          disabled={loading || !form.firstName || !form.lastName || !form.email || !form.phone || !form.password}
           className="w-full bg-neutral-900 text-white font-medium py-3 rounded-xl hover:bg-neutral-700 transition-colors disabled:opacity-40 mt-2"
         >
           {loading ? 'נרשם...' : 'הרשמה'}
@@ -283,7 +286,7 @@ function ConfirmForm() {
     setError('')
     setLoading(true)
     try {
-      await auth.confirmCode(auth.pendingPhone, code)
+      await auth.confirmCode(auth.pendingEmail, code)
       auth.setShowAuth('login')
     } catch (err: any) {
       setError(err.message || 'שגיאה באימות')
@@ -294,9 +297,9 @@ function ConfirmForm() {
 
   return (
     <div className="p-8">
-      <h2 className="text-2xl font-bold text-neutral-900 mb-1 text-center">אימות טלפון</h2>
-      <p className="text-neutral-400 text-sm text-center mb-8">
-        הכנס את הקוד שנשלח ל-{auth.pendingPhone}
+      <h2 className="text-2xl font-bold text-neutral-900 mb-1 text-center">אימות מייל</h2>
+      <p className="text-neutral-400 text-sm text-center mb-8" dir="ltr">
+        הכנס את הקוד שנשלח ל-{auth.pendingEmail}
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">

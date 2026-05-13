@@ -2,7 +2,9 @@ const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = re
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const crypto = require('crypto');
 
-const REGION = process.env.AWS_REGION || 'eu-north-1';
+// S3 buckets live in a specific region that may differ from where Cognito (AWS_REGION) lives.
+// Prefer S3_REGION; fall back to AWS_REGION then to eu-north-1 for legacy buckets.
+const REGION = process.env.S3_REGION || process.env.AWS_REGION || 'eu-north-1';
 const IMAGES_BUCKET = process.env.AWS_S3_IMAGES_BUCKET || 'zimmerflow-images';
 const CONTRACTS_BUCKET = process.env.AWS_S3_CONTRACTS_BUCKET || 'zimmerflow-contracts';
 
