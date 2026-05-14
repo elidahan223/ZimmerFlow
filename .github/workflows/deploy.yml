@@ -1,0 +1,104 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # allow manual trigger from Actions tab
+
+env:
+  AWS_REGION: eu-central-1
+  EB_APPLICATION: BiktotHazhav
+  EB_ENVIRONMENT: BiktotHazhav-env
+  FRONTEND_BUCKET: biktothazhav-frontend
+  CLOUDFRONT_DISTRIBUTION_ID: E232ULZSQXPBHP
+
+jobs:
+  # ───────────────────────── BACKEND ─────────────────────────
+  deploy-backend:
+    name: Deploy backend to Elastic Beanstalk
+    runs-on: ubuntu-latest
+    # Only run if backend files changed (or it's a manual trigger).
+    # Comment out the `if:` to deploy on every push.
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      contains(toJson(github.event.commits.*.modified), 'backend/') ||
+      contains(toJson(github.event.commits.*.added), 'backend/') ||
+      contains(toJson(github.event.commits.*.removed), 'backend/')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build deployment ZIP
+        working-directory: backend
+        run: |
+          # Zip src/, prisma/, package.json, package-lock.json — no node_modules.
+          # `zip` on Linux uses forward slashes natively, so EB unzip is happy.
+          zip -r ../backend-deploy.zip src prisma package.json package-lock.json
+          ls -lh ../backend-deploy.zip
+
+      - name: Deploy to Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v22
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          application_name: ${{ env.EB_APPLICATION }}
+          environment_name: ${{ env.EB_ENVIRONMENT }}
+          region: ${{ env.AWS_REGION }}
+          version_label: "gh-${{ github.run_number }}-${{ github.sha }}"
+          deployment_package: backend-deploy.zip
+          wait_for_deployment: true
+
+  # ───────────────────────── FRONTEND ─────────────────────────
+  deploy-frontend:
+    name: Build and deploy frontend to S3 + CloudFront
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      contains(toJson(github.event.commits.*.modified), 'frontend/') ||
+      contains(toJson(github.event.commits.*.added), 'frontend/') ||
+      contains(toJson(github.event.commits.*.removed), 'frontend/')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Sync dist/ to S3
+        working-directory: frontend
+        run: |
+          # Hashed assets get long cache; everything else (incl. index.html) no-cache.
+          aws s3 sync dist/ "s3://${{ env.FRONTEND_BUCKET }}/" \
+            --delete \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "index.html" \
+            --exclude "*.html"
+          aws s3 sync dist/ "s3://${{ env.FRONTEND_BUCKET }}/" \
+            --cache-control "no-cache, no-store, must-revalidate" \
+            --exclude "*" \
+            --include "*.html"
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ env.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths "/index.html" "/"

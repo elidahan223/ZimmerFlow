@@ -4,3 +4,9 @@ dist/
 *.log
 .vite/
 .prisma/
+
+# Local artifacts — never push to git
+BundleLogs-*.zip
+*-local-dump.bin
+biktothazhav-backend.zip
+backend-deploy.zip

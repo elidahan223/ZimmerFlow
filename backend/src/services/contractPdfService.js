@@ -7,18 +7,20 @@ const { uploadContractBuffer } = require('./s3');
 
 const getBrowser = async () => {
   try {
-    const chromium = require('@sparticuz/chromium');
+    const chromiumPkg = require('@sparticuz/chromium');
+    const chromium = chromiumPkg.default || chromiumPkg;
     const puppeteer = require('puppeteer-core');
     const execPath = await chromium.executablePath();
     return await puppeteer.launch({
-      headless: 'new',
+      headless: true,
       args: chromium.args,
       executablePath: execPath,
     });
   } catch (e) {
+    console.error('[contractPdf] sparticuz path failed, falling back to bundled puppeteer:', e.message);
     const puppeteer = require('puppeteer');
     return await puppeteer.launch({
-      headless: 'new',
+      headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
   }

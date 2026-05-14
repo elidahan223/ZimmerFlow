@@ -235,7 +235,6 @@ export default function Calendar() {
             const isPast = date < todayStr
             const dayInfo = monthHolidays.get(date)
             const hasHoliday = dayInfo && dayInfo.holidays.length > 0
-            const hasYomTov = dayInfo?.holidays.some(h => h.isYomTov)
 
             const dayBg = getDayBg(date)
             const activeCount = dayBookings.filter(b => b.status !== 'CANCELLED').length
