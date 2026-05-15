@@ -10,6 +10,18 @@ const getBrowser = async () => {
     const chromiumPkg = require('@sparticuz/chromium');
     const chromium = chromiumPkg.default || chromiumPkg;
     const puppeteer = require('puppeteer-core');
+
+    // sparticuz/chromium ships without fonts; preload a Hebrew-capable font so
+    // RTL contract text renders instead of empty .notdef boxes.
+    if (typeof chromium.font === 'function') {
+      try {
+        await chromium.font('https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf');
+        await chromium.font('https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Bold.ttf');
+      } catch (fontErr) {
+        console.error('[contractPdf] failed to preload Hebrew font:', fontErr.message);
+      }
+    }
+
     const execPath = await chromium.executablePath();
     return await puppeteer.launch({
       headless: true,
@@ -63,11 +75,9 @@ function createContractHtml(data) {
 <head>
   <meta charset="UTF-8">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap');
-
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'Rubik', Arial, sans-serif;
+      font-family: 'Noto Sans Hebrew', 'Rubik', Arial, sans-serif;
       direction: rtl; text-align: right;
       padding: 40px 50px; color: #111;
       font-size: 13px; line-height: 1.7;
