@@ -5,6 +5,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { uploadContractBuffer } = require('./s3');
 
 const FONT_DIR = path.join(__dirname, '..', '..', 'fonts');
@@ -19,25 +20,30 @@ const getBrowser = async () => {
     const chromium = chromiumPkg.default || chromiumPkg;
     const puppeteer = require('puppeteer-core');
 
-    // sparticuz/chromium ships without fonts; load Noto Sans Hebrew from the
-    // bundled fonts/ directory so RTL contract text renders instead of empty
-    // .notdef boxes. Files are fetched in CI and shipped in the deploy ZIP —
-    // no runtime network dependency on githubusercontent.com from EB.
-    if (typeof chromium.font === 'function') {
+    // executablePath() inflates fonts.tar.br into FONTCONFIG_PATH (/tmp/fonts)
+    // and sets up env vars; call it first so that directory exists before we
+    // drop our extra Hebrew TTFs in alongside chromium's bundled fonts.
+    const execPath = await chromium.executablePath();
+
+    // sparticuz/chromium 148 removed the chromium.font() helper. Instead
+    // chromium discovers fonts via fontconfig in $FONTCONFIG_PATH (/tmp/fonts).
+    // Copy our bundled Noto Sans Hebrew there so RTL contract text renders
+    // instead of empty .notdef boxes.
+    const fontconfigDir = process.env.FONTCONFIG_PATH || path.join(os.tmpdir(), 'fonts');
+    try {
+      fs.mkdirSync(fontconfigDir, { recursive: true });
       for (const fontPath of HEBREW_FONTS) {
         if (!fs.existsSync(fontPath)) {
           console.warn(`[contractPdf] Hebrew font missing at ${fontPath} — Hebrew text will not render`);
           continue;
         }
-        try {
-          await chromium.font(fontPath);
-        } catch (fontErr) {
-          console.error(`[contractPdf] failed to load font ${fontPath}:`, fontErr.message);
-        }
+        const dest = path.join(fontconfigDir, path.basename(fontPath));
+        if (!fs.existsSync(dest)) fs.copyFileSync(fontPath, dest);
       }
+    } catch (fontErr) {
+      console.error('[contractPdf] failed to install Hebrew fonts:', fontErr.message);
     }
 
-    const execPath = await chromium.executablePath();
     return await puppeteer.launch({
       headless: true,
       args: chromium.args,
