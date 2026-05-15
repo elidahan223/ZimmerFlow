@@ -34,10 +34,10 @@
     "jwks-rsa": "^4.0.1",
     "pg": "^8.20.0",
     "prisma": "^5.22.0",
-    "puppeteer": "^24.42.0",
     "puppeteer-core": "^24.43.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "nodemon": "^3.1.14",
+    "puppeteer": "^24.42.0"
   }
 }
