@@ -42,6 +42,17 @@ jobs:
         working-directory: backend
         run: npx prisma generate
 
+      - name: Download Noto Sans Hebrew font for contract PDFs
+        working-directory: backend
+        run: |
+          # contractPdfService.js inlines this TTF as base64 inside @font-face
+          # so chromium on EB doesn't need to fetch a webfont at runtime.
+          mkdir -p fonts
+          curl -sSL --fail \
+            -o fonts/NotoSansHebrew-Regular.ttf \
+            https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf
+          ls -lh fonts/
+
       - name: Build deployment ZIP (includes node_modules)
         working-directory: backend
         run: |
@@ -49,7 +60,7 @@ jobs:
           # npm install on t3.micro. EB still runs npm install but it's a
           # near no-op when packages and lockfile already match.
           zip -rq ../backend-deploy.zip \
-            src prisma .ebextensions .npmrc \
+            src prisma .ebextensions .npmrc fonts \
             package.json package-lock.json node_modules \
             -x "node_modules/.cache/*"
           ls -lh ../backend-deploy.zip

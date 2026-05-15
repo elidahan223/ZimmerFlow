@@ -3,7 +3,25 @@
  * משתמש ב-Puppeteer לרינדור HTML→PDF עם תמיכה מלאה ב-RTL וגופנים עבריים.
  */
 
+const path = require('path');
+const fs = require('fs');
 const { uploadContractBuffer } = require('./s3');
+
+// Inline the Hebrew font as a base64 data URL inside the CSS so the PDF
+// rendering has zero runtime network dependency. Loaded once at module
+// init so we don't re-read the file on every contract.
+const HEBREW_FONT_PATH = path.join(__dirname, '..', '..', 'fonts', 'NotoSansHebrew-Regular.ttf');
+let HEBREW_FONT_FACE = '';
+try {
+  if (fs.existsSync(HEBREW_FONT_PATH)) {
+    const fontBase64 = fs.readFileSync(HEBREW_FONT_PATH).toString('base64');
+    HEBREW_FONT_FACE = `@font-face { font-family: 'NotoSansHebrew'; src: url(data:font/ttf;base64,${fontBase64}) format('truetype'); font-weight: normal; font-style: normal; }`;
+  } else {
+    console.warn(`[contractPdf] Hebrew font missing at ${HEBREW_FONT_PATH} — Hebrew text will not render in PDFs`);
+  }
+} catch (e) {
+  console.error('[contractPdf] failed to load Hebrew font for embedding:', e.message);
+}
 
 const getBrowser = async () => {
   try {
@@ -63,14 +81,14 @@ function createContractHtml(data) {
 <head>
   <meta charset="UTF-8">
   <style>
-    /* Load a Hebrew-capable webfont via Google Fonts. sparticuz/chromium
-       ships without Hebrew system fonts, so we have to bring one along
-       inside the page itself. waitUntil:'networkidle0' below blocks the
-       PDF render until this stylesheet has loaded. */
-    @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap');
+    /* Hebrew font is embedded as base64 inside @font-face so chromium has
+       no runtime network dependency on Google Fonts (which appears to be
+       blocked / unreachable from this EB instance — every previous URL
+       and FONTCONFIG approach silently produced an empty PDF). */
+    ${HEBREW_FONT_FACE}
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'Rubik', Arial, sans-serif;
+      font-family: 'NotoSansHebrew', Arial, sans-serif;
       direction: rtl; text-align: right;
       padding: 40px 50px; color: #111;
       font-size: 13px; line-height: 1.7;
