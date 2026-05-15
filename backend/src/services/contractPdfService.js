@@ -3,47 +3,14 @@
  * משתמש ב-Puppeteer לרינדור HTML→PDF עם תמיכה מלאה ב-RTL וגופנים עבריים.
  */
 
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
 const { uploadContractBuffer } = require('./s3');
-
-const FONT_DIR = path.join(__dirname, '..', '..', 'fonts');
-const HEBREW_FONTS = [
-  path.join(FONT_DIR, 'NotoSansHebrew-Regular.ttf'),
-  path.join(FONT_DIR, 'NotoSansHebrew-Bold.ttf'),
-];
 
 const getBrowser = async () => {
   try {
     const chromiumPkg = require('@sparticuz/chromium');
     const chromium = chromiumPkg.default || chromiumPkg;
     const puppeteer = require('puppeteer-core');
-
-    // executablePath() inflates fonts.tar.br into FONTCONFIG_PATH (/tmp/fonts)
-    // and sets up env vars; call it first so that directory exists before we
-    // drop our extra Hebrew TTFs in alongside chromium's bundled fonts.
     const execPath = await chromium.executablePath();
-
-    // sparticuz/chromium 148 removed the chromium.font() helper. Instead
-    // chromium discovers fonts via fontconfig in $FONTCONFIG_PATH (/tmp/fonts).
-    // Copy our bundled Noto Sans Hebrew there so RTL contract text renders
-    // instead of empty .notdef boxes.
-    const fontconfigDir = process.env.FONTCONFIG_PATH || path.join(os.tmpdir(), 'fonts');
-    try {
-      fs.mkdirSync(fontconfigDir, { recursive: true });
-      for (const fontPath of HEBREW_FONTS) {
-        if (!fs.existsSync(fontPath)) {
-          console.warn(`[contractPdf] Hebrew font missing at ${fontPath} — Hebrew text will not render`);
-          continue;
-        }
-        const dest = path.join(fontconfigDir, path.basename(fontPath));
-        if (!fs.existsSync(dest)) fs.copyFileSync(fontPath, dest);
-      }
-    } catch (fontErr) {
-      console.error('[contractPdf] failed to install Hebrew fonts:', fontErr.message);
-    }
-
     return await puppeteer.launch({
       headless: true,
       args: chromium.args,
@@ -96,9 +63,14 @@ function createContractHtml(data) {
 <head>
   <meta charset="UTF-8">
   <style>
+    /* Load a Hebrew-capable webfont via Google Fonts. sparticuz/chromium
+       ships without Hebrew system fonts, so we have to bring one along
+       inside the page itself. waitUntil:'networkidle0' below blocks the
+       PDF render until this stylesheet has loaded. */
+    @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap');
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'Noto Sans Hebrew', 'Rubik', Arial, sans-serif;
+      font-family: 'Rubik', Arial, sans-serif;
       direction: rtl; text-align: right;
       padding: 40px 50px; color: #111;
       font-size: 13px; line-height: 1.7;
