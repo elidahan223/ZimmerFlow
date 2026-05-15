@@ -28,9 +28,9 @@ jobs:
       - name: Build deployment ZIP
         working-directory: backend
         run: |
-          # Zip src/, prisma/, package.json, package-lock.json — no node_modules.
-          # `zip` on Linux uses forward slashes natively, so EB unzip is happy.
-          zip -r ../backend-deploy.zip src prisma package.json package-lock.json
+          # Zip src/, prisma/, .ebextensions/, package.json, package-lock.json
+          # No node_modules — EB runs npm install on the instance.
+          zip -r ../backend-deploy.zip src prisma .ebextensions package.json package-lock.json
           ls -lh ../backend-deploy.zip
 
       - name: Deploy to Elastic Beanstalk
