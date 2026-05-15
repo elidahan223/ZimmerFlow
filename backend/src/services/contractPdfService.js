@@ -3,7 +3,15 @@
  * משתמש ב-Puppeteer לרינדור HTML→PDF עם תמיכה מלאה ב-RTL וגופנים עבריים.
  */
 
+const path = require('path');
+const fs = require('fs');
 const { uploadContractBuffer } = require('./s3');
+
+const FONT_DIR = path.join(__dirname, '..', '..', 'fonts');
+const HEBREW_FONTS = [
+  path.join(FONT_DIR, 'NotoSansHebrew-Regular.ttf'),
+  path.join(FONT_DIR, 'NotoSansHebrew-Bold.ttf'),
+];
 
 const getBrowser = async () => {
   try {
@@ -11,14 +19,21 @@ const getBrowser = async () => {
     const chromium = chromiumPkg.default || chromiumPkg;
     const puppeteer = require('puppeteer-core');
 
-    // sparticuz/chromium ships without fonts; preload a Hebrew-capable font so
-    // RTL contract text renders instead of empty .notdef boxes.
+    // sparticuz/chromium ships without fonts; load Noto Sans Hebrew from the
+    // bundled fonts/ directory so RTL contract text renders instead of empty
+    // .notdef boxes. Files are fetched in CI and shipped in the deploy ZIP —
+    // no runtime network dependency on githubusercontent.com from EB.
     if (typeof chromium.font === 'function') {
-      try {
-        await chromium.font('https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf');
-        await chromium.font('https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Bold.ttf');
-      } catch (fontErr) {
-        console.error('[contractPdf] failed to preload Hebrew font:', fontErr.message);
+      for (const fontPath of HEBREW_FONTS) {
+        if (!fs.existsSync(fontPath)) {
+          console.warn(`[contractPdf] Hebrew font missing at ${fontPath} — Hebrew text will not render`);
+          continue;
+        }
+        try {
+          await chromium.font(fontPath);
+        } catch (fontErr) {
+          console.error(`[contractPdf] failed to load font ${fontPath}:`, fontErr.message);
+        }
       }
     }
 

@@ -5,6 +5,10 @@ dist/
 .vite/
 .prisma/
 
+# Hebrew fonts for contract PDFs are downloaded by CI before bundling,
+# not committed to the repo.
+backend/fonts/
+
 # Local artifacts — never push to git
 BundleLogs-*.zip
 *-local-dump.bin
