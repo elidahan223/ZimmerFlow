@@ -25,12 +25,33 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build deployment ZIP
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install production dependencies on Linux runner
+        working-directory: backend
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+        run: npm ci --omit=dev
+
+      - name: Generate Prisma client for Linux
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Build deployment ZIP (includes node_modules)
         working-directory: backend
         run: |
-          # Zip src/, prisma/, .ebextensions/, package.json, package-lock.json
-          # No node_modules — EB runs npm install on the instance.
-          zip -r ../backend-deploy.zip src prisma .ebextensions package.json package-lock.json
+          # Pre-built node_modules ships in the bundle so EB skips the slow
+          # npm install on t3.micro. EB still runs npm install but it's a
+          # near no-op when packages and lockfile already match.
+          zip -rq ../backend-deploy.zip \
+            src prisma .ebextensions .npmrc \
+            package.json package-lock.json node_modules \
+            -x "node_modules/.cache/*"
           ls -lh ../backend-deploy.zip
 
       - name: Deploy to Elastic Beanstalk
