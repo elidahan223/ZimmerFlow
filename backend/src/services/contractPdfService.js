@@ -14,8 +14,10 @@ const HEBREW_FONT_PATH = path.join(__dirname, '..', '..', 'fonts', 'NotoSansHebr
 let HEBREW_FONT_FACE = '';
 try {
   if (fs.existsSync(HEBREW_FONT_PATH)) {
-    const fontBase64 = fs.readFileSync(HEBREW_FONT_PATH).toString('base64');
-    HEBREW_FONT_FACE = `@font-face { font-family: 'NotoSansHebrew'; src: url(data:font/ttf;base64,${fontBase64}) format('truetype'); font-weight: normal; font-style: normal; }`;
+    const fontBuffer = fs.readFileSync(HEBREW_FONT_PATH);
+    const fontBase64 = fontBuffer.toString('base64');
+    HEBREW_FONT_FACE = `@font-face { font-family: 'NotoSansHebrew'; src: url(data:font/ttf;base64,${fontBase64}) format('truetype'); font-weight: normal; font-style: normal; font-display: block; }`;
+    console.log(`[contractPdf] embedded Hebrew font: ${fontBuffer.length} bytes -> ${fontBase64.length} base64 chars`);
   } else {
     console.warn(`[contractPdf] Hebrew font missing at ${HEBREW_FONT_PATH} — Hebrew text will not render in PDFs`);
   }
@@ -215,16 +217,23 @@ function createContractHtml(data) {
 
 async function generateContractPdf(data) {
   const html = createContractHtml(data);
+  console.log(`[contractPdf] rendering HTML: ${html.length} chars, font-face block present: ${HEBREW_FONT_FACE.length > 0}`);
   let browser = null;
   try {
     browser = await getBrowser();
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
+    // Without this, page.pdf() can fire before the embedded @font-face is
+    // actually decoded and applied — Chromium lays out the document with
+    // .notdef glyphs (or nothing) and we get a blank PDF. fonts.ready
+    // resolves once every face declared on the page has loaded or failed.
+    await page.evaluate(() => document.fonts.ready);
     const pdfBuffer = await page.pdf({
       format: 'A4',
       printBackground: true,
       margin: { top: '15mm', right: '12mm', bottom: '15mm', left: '12mm' },
     });
+    console.log(`[contractPdf] generated PDF: ${pdfBuffer.length} bytes`);
     await browser.close();
     browser = null;
 
