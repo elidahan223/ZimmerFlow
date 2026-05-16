@@ -3,46 +3,13 @@
  * משתמש ב-Puppeteer לרינדור HTML→PDF עם תמיכה מלאה ב-RTL וגופנים עבריים.
  */
 
-const path = require('path');
-const fs = require('fs');
 const { uploadContractBuffer } = require('./s3');
 
-// Inline both fonts as base64 data URLs inside the CSS so PDF rendering
-// has zero runtime network dependency. Two separate family-names: chromium
-// tries the first and falls through to the next when a glyph is missing.
-// Avoids the unicode-range approach which silently produced 9KB blank
-// PDFs in gh-17 (chromium apparently can't combine unicode-range with
-// data: WOFF2 reliably).
-const FONTS_DIR = path.join(__dirname, '..', '..', 'fonts');
-
-function loadFontFace(filename, family, mime, format, unicodeRange) {
-  const filePath = path.join(FONTS_DIR, filename);
-  if (!fs.existsSync(filePath)) {
-    console.warn(`[contractPdf] font missing at ${filePath} — text using ${family} will not render`);
-    return '';
-  }
-  const fontBuffer = fs.readFileSync(filePath);
-  const fontBase64 = fontBuffer.toString('base64');
-  console.log(`[contractPdf] embedded ${filename} as ${family}: ${fontBuffer.length} bytes -> ${fontBase64.length} base64 chars`);
-  const rangeDecl = unicodeRange ? ` unicode-range: ${unicodeRange};` : '';
-  return `@font-face { font-family: '${family}'; src: url(data:${mime};base64,${fontBase64}) format('${format}'); font-weight: normal; font-style: normal; font-display: block;${rangeDecl} }`;
-}
-
-let HEBREW_FONT_FACE = '';
-try {
-  HEBREW_FONT_FACE = [
-    // Restrict NotoSansHebrew to Hebrew code points. Without this it
-    // happily emits a .notdef box for digits/Latin and chromium never
-    // falls through to RubikLatin (the previous PDF had □□ where every
-    // date and price should have been).
-    loadFontFace('NotoSansHebrew-Regular.ttf', 'NotoSansHebrew', 'font/ttf', 'truetype', 'U+0590-05FF, U+FB1D-FB4F'),
-    // No range on the Latin face — it's the catch-all fallback for
-    // anything outside the Hebrew block.
-    loadFontFace('Rubik-Latin.woff2', 'RubikLatin', 'font/woff2', 'woff2'),
-  ].join('\n');
-} catch (e) {
-  console.error('[contractPdf] failed to load fonts for embedding:', e.message);
-}
+// Match Shetzli's pdfService.js, which renders identical Hebrew contracts
+// successfully: pull Rubik from fonts.googleapis.com via CSS @import
+// inside the page itself. Combined with page.evaluate(document.fonts.ready)
+// below, chromium loads the webfont before snapshotting.
+const HEBREW_FONT_FACE = `@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap');`;
 
 const getBrowser = async () => {
   try {
@@ -109,7 +76,7 @@ function createContractHtml(data) {
     ${HEBREW_FONT_FACE}
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'NotoSansHebrew', 'RubikLatin', sans-serif;
+      font-family: 'Rubik', sans-serif;
       direction: rtl; text-align: right;
       padding: 40px 50px; color: #111;
       font-size: 13px; line-height: 1.7;

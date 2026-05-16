@@ -42,22 +42,6 @@ jobs:
         working-directory: backend
         run: npx prisma generate
 
-      - name: Download Hebrew + Latin fonts for contract PDFs
-        working-directory: backend
-        run: |
-          # contractPdfService.js base64-embeds these into @font-face so
-          # chromium on EB has zero runtime network dependency. Hebrew via
-          # NotoSansHebrew TTF (proven to render in gh-13) — small at 26KB.
-          # Latin/digits via fontsource's Rubik latin subset (~19KB WOFF2).
-          mkdir -p fonts
-          curl -sSL --fail \
-            -o fonts/NotoSansHebrew-Regular.ttf \
-            https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf
-          curl -sSL --fail \
-            -o fonts/Rubik-Latin.woff2 \
-            "https://cdn.jsdelivr.net/npm/@fontsource/rubik@5/files/rubik-latin-400-normal.woff2"
-          ls -lh fonts/
-
       - name: Build deployment ZIP (includes node_modules)
         working-directory: backend
         run: |
@@ -65,7 +49,7 @@ jobs:
           # npm install on t3.micro. EB still runs npm install but it's a
           # near no-op when packages and lockfile already match.
           zip -rq ../backend-deploy.zip \
-            src prisma .ebextensions .npmrc fonts \
+            src prisma .ebextensions .npmrc \
             package.json package-lock.json node_modules \
             -x "node_modules/.cache/*"
           ls -lh ../backend-deploy.zip
