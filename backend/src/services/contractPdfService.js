@@ -7,10 +7,11 @@ const path = require('path');
 const fs = require('fs');
 const { uploadContractBuffer } = require('./s3');
 
-// Inline both Hebrew and Latin fonts as base64 data URLs inside the CSS so
-// the PDF rendering has zero runtime network dependency. NotoSansHebrew
-// covers Hebrew glyphs only — digits, Latin letters and punctuation come
-// from NotoSans. Both loaded once at module init.
+// Inline Rubik (Hebrew + Latin + digits in a single ~150KB TTF) as a
+// base64 data URL inside the CSS so the PDF rendering has zero runtime
+// network dependency. Tried NotoSansHebrew + NotoSans-Regular first but
+// NotoSans-Regular is ~570KB (covers every script on earth) and the
+// resulting ~800KB HTML choked chromium into producing 6KB blank PDFs.
 const FONTS_DIR = path.join(__dirname, '..', '..', 'fonts');
 
 function loadFontFace(filename, family) {
@@ -27,10 +28,7 @@ function loadFontFace(filename, family) {
 
 let HEBREW_FONT_FACE = '';
 try {
-  HEBREW_FONT_FACE = [
-    loadFontFace('NotoSans-Regular.ttf', 'NotoSans'),
-    loadFontFace('NotoSansHebrew-Regular.ttf', 'NotoSansHebrew'),
-  ].join('\n');
+  HEBREW_FONT_FACE = loadFontFace('Rubik-Regular.ttf', 'Rubik');
 } catch (e) {
   console.error('[contractPdf] failed to load fonts for embedding:', e.message);
 }
@@ -100,7 +98,7 @@ function createContractHtml(data) {
     ${HEBREW_FONT_FACE}
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'NotoSansHebrew', 'NotoSans', sans-serif;
+      font-family: 'Rubik', sans-serif;
       direction: rtl; text-align: right;
       padding: 40px 50px; color: #111;
       font-size: 13px; line-height: 1.7;

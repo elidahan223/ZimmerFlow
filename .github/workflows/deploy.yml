@@ -42,20 +42,18 @@ jobs:
         working-directory: backend
         run: npx prisma generate
 
-      - name: Download Noto fonts for contract PDFs
+      - name: Download Rubik font for contract PDFs
         working-directory: backend
         run: |
-          # contractPdfService.js inlines these TTFs as base64 inside
-          # @font-face so chromium on EB doesn't need to fetch a webfont at
-          # runtime. NotoSansHebrew covers Hebrew glyphs; NotoSans covers
-          # digits, Latin letters and punctuation that NotoSansHebrew lacks.
+          # contractPdfService.js inlines this TTF as base64 inside @font-face
+          # so chromium on EB doesn't need to fetch a webfont at runtime.
+          # Rubik covers Hebrew, Latin and digits in a single ~150KB file —
+          # NotoSans-Regular alone was 570KB and the resulting 800KB HTML
+          # choked chromium into producing blank PDFs.
           mkdir -p fonts
           curl -sSL --fail \
-            -o fonts/NotoSansHebrew-Regular.ttf \
-            https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf
-          curl -sSL --fail \
-            -o fonts/NotoSans-Regular.ttf \
-            https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf
+            -o fonts/Rubik-Regular.ttf \
+            https://raw.githubusercontent.com/google/fonts/main/ofl/rubik/static/Rubik-Regular.ttf
           ls -lh fonts/
 
       - name: Build deployment ZIP (includes node_modules)
