@@ -8,29 +8,22 @@
 const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
-const bidiFactory = require('bidi-js');
 const { uploadContractBuffer } = require('./s3');
 
-const bidi = bidiFactory();
-
-// Convert a logical-order Hebrew/mixed string into the visual order pdfkit
-// will actually paint. Without this, runs of Latin/digits inside Hebrew
-// text get character-reversed (e.g. "2026-06-10" → "6202-60-10",
-// "elidahan223@walla.co.il" → ".oc.allaw@322nahadile") because pdfkit
-// itself doesn't implement the Unicode Bidirectional Algorithm.
-function toVisualOrder(text) {
-  if (!text) return '';
-  const str = String(text);
-  const embeddingLevels = bidi.getEmbeddingLevels(str, 'rtl');
-  const reorderSegments = bidi.getReorderSegments(str, embeddingLevels);
-  if (!reorderSegments.length) return str;
-  const chars = str.split('');
-  for (const segment of reorderSegments) {
-    const [start, end] = segment;
-    const slice = chars.slice(start, end + 1).reverse();
-    for (let i = 0; i < slice.length; i++) chars[start + i] = slice[i];
-  }
-  return chars.join('');
+// features:['rtla'] is what lets pdfkit lay Hebrew out right-to-left, but
+// it reverses *every* code point in the string — so any run of digits or
+// Latin characters embedded in Hebrew (dates, phone numbers, emails)
+// comes out reversed too. Pre-reverse those runs in the input string so
+// they get re-reversed by the RTL flow back to the correct order, while
+// the surrounding Hebrew stays in proper visual order.
+//
+// bidi-js was tried here and over-corrected — it flipped the Hebrew too.
+// The pre-reverse trick is the standard fix for pdfkit + Hebrew and
+// matches what tools like html-pdf-node ship with by default.
+const LATIN_OR_DIGIT_RUN = /[A-Za-z0-9@._\-+/:'"!?#%&*()\[\]{}<>=,]+/g;
+function fixBidi(text) {
+  if (text == null) return '';
+  return String(text).replace(LATIN_OR_DIGIT_RUN, (match) => match.split('').reverse().join(''));
 }
 
 // Rubik covers Hebrew + Latin + digits in one TTF. The CI workflow
@@ -60,14 +53,13 @@ function fmtStr(s, fallback = '____________') {
   return s || fallback;
 }
 
-// Reorder the string with the Unicode Bidi Algorithm so Hebrew runs sit
-// right-to-left while Latin/digit/punctuation runs keep their original
-// left-to-right order. After this we just hand pdfkit the visual order
-// and ask for right-alignment — no features:['rtla'], which would
-// reverse Latin characters too.
+// Pre-reverse Latin/digit runs, then let features:['rtla'] reverse the
+// whole string for RTL layout; the Latin runs end up flipped back to
+// their original order while the Hebrew gets its proper RTL placement.
 function heText(doc, text, opts = {}) {
-  doc.text(toVisualOrder(text), {
+  doc.text(fixBidi(text), {
     align: 'right',
+    features: ['rtla'],
     ...opts,
   });
 }
