@@ -51,9 +51,12 @@ jobs:
           # NotoSans-Regular alone was 570KB and the resulting 800KB HTML
           # choked chromium into producing blank PDFs.
           mkdir -p fonts
+          # google/fonts ships Rubik only as the variable file Rubik[wght].ttf
+          # (no static/ subdir). The brackets must be URL-encoded as %5B/%5D.
+          # A variable font works in chromium identically to a static TTF.
           curl -sSL --fail \
             -o fonts/Rubik-Regular.ttf \
-            https://raw.githubusercontent.com/google/fonts/main/ofl/rubik/static/Rubik-Regular.ttf
+            "https://raw.githubusercontent.com/google/fonts/main/ofl/rubik/Rubik%5Bwght%5D.ttf"
           ls -lh fonts/
 
       - name: Build deployment ZIP (includes node_modules)
