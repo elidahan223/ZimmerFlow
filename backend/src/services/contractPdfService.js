@@ -8,7 +8,30 @@
 const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
+const bidiFactory = require('bidi-js');
 const { uploadContractBuffer } = require('./s3');
+
+const bidi = bidiFactory();
+
+// Convert a logical-order Hebrew/mixed string into the visual order pdfkit
+// will actually paint. Without this, runs of Latin/digits inside Hebrew
+// text get character-reversed (e.g. "2026-06-10" → "6202-60-10",
+// "elidahan223@walla.co.il" → ".oc.allaw@322nahadile") because pdfkit
+// itself doesn't implement the Unicode Bidirectional Algorithm.
+function toVisualOrder(text) {
+  if (!text) return '';
+  const str = String(text);
+  const embeddingLevels = bidi.getEmbeddingLevels(str, 'rtl');
+  const reorderSegments = bidi.getReorderSegments(str, embeddingLevels);
+  if (!reorderSegments.length) return str;
+  const chars = str.split('');
+  for (const segment of reorderSegments) {
+    const [start, end] = segment;
+    const slice = chars.slice(start, end + 1).reverse();
+    for (let i = 0; i < slice.length; i++) chars[start + i] = slice[i];
+  }
+  return chars.join('');
+}
 
 // Rubik covers Hebrew + Latin + digits in one TTF. The CI workflow
 // downloads this file from google/fonts before bundling the ZIP.
@@ -37,13 +60,14 @@ function fmtStr(s, fallback = '____________') {
   return s || fallback;
 }
 
-// All Hebrew text needs features:['rtla'] so the OpenType shaper applies
-// the right-to-left Arabic shaping rules (also covers Hebrew). align:'right'
-// puts the text at the right edge of the page, which is where Hebrew starts.
+// Reorder the string with the Unicode Bidi Algorithm so Hebrew runs sit
+// right-to-left while Latin/digit/punctuation runs keep their original
+// left-to-right order. After this we just hand pdfkit the visual order
+// and ask for right-alignment — no features:['rtla'], which would
+// reverse Latin characters too.
 function heText(doc, text, opts = {}) {
-  doc.text(text, {
+  doc.text(toVisualOrder(text), {
     align: 'right',
-    features: ['rtla'],
     ...opts,
   });
 }
