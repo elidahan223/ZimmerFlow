@@ -15,7 +15,7 @@ const { uploadContractBuffer } = require('./s3');
 // data: WOFF2 reliably).
 const FONTS_DIR = path.join(__dirname, '..', '..', 'fonts');
 
-function loadFontFace(filename, family, mime, format) {
+function loadFontFace(filename, family, mime, format, unicodeRange) {
   const filePath = path.join(FONTS_DIR, filename);
   if (!fs.existsSync(filePath)) {
     console.warn(`[contractPdf] font missing at ${filePath} — text using ${family} will not render`);
@@ -24,13 +24,20 @@ function loadFontFace(filename, family, mime, format) {
   const fontBuffer = fs.readFileSync(filePath);
   const fontBase64 = fontBuffer.toString('base64');
   console.log(`[contractPdf] embedded ${filename} as ${family}: ${fontBuffer.length} bytes -> ${fontBase64.length} base64 chars`);
-  return `@font-face { font-family: '${family}'; src: url(data:${mime};base64,${fontBase64}) format('${format}'); font-weight: normal; font-style: normal; font-display: block; }`;
+  const rangeDecl = unicodeRange ? ` unicode-range: ${unicodeRange};` : '';
+  return `@font-face { font-family: '${family}'; src: url(data:${mime};base64,${fontBase64}) format('${format}'); font-weight: normal; font-style: normal; font-display: block;${rangeDecl} }`;
 }
 
 let HEBREW_FONT_FACE = '';
 try {
   HEBREW_FONT_FACE = [
-    loadFontFace('NotoSansHebrew-Regular.ttf', 'NotoSansHebrew', 'font/ttf', 'truetype'),
+    // Restrict NotoSansHebrew to Hebrew code points. Without this it
+    // happily emits a .notdef box for digits/Latin and chromium never
+    // falls through to RubikLatin (the previous PDF had □□ where every
+    // date and price should have been).
+    loadFontFace('NotoSansHebrew-Regular.ttf', 'NotoSansHebrew', 'font/ttf', 'truetype', 'U+0590-05FF, U+FB1D-FB4F'),
+    // No range on the Latin face — it's the catch-all fallback for
+    // anything outside the Hebrew block.
     loadFontFace('Rubik-Latin.woff2', 'RubikLatin', 'font/woff2', 'woff2'),
   ].join('\n');
 } catch (e) {
