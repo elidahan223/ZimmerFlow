@@ -13,20 +13,20 @@ const HEBREW_FONT_FACE = `@import url('https://fonts.googleapis.com/css2?family=
 
 const getBrowser = async () => {
   try {
-    const chromiumPkg = require('@sparticuz/chromium');
-    const chromium = chromiumPkg.default || chromiumPkg;
+    const chromium = require('@sparticuz/chromium');
     const puppeteer = require('puppeteer-core');
     const execPath = await chromium.executablePath();
+    console.log('[contractPdf] Using chromium, executablePath:', execPath);
     return await puppeteer.launch({
-      headless: true,
+      headless: 'new',
       args: chromium.args,
       executablePath: execPath,
     });
   } catch (e) {
-    console.error('[contractPdf] sparticuz path failed, falling back to bundled puppeteer:', e.message);
+    console.log('[contractPdf] Chromium not available, falling back to puppeteer:', e.message);
     const puppeteer = require('puppeteer');
     return await puppeteer.launch({
-      headless: true,
+      headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
   }
