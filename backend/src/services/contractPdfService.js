@@ -209,11 +209,6 @@ async function generateContractPdf(data) {
     browser = await getBrowser();
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
-    // Without this, page.pdf() can fire before the embedded @font-face is
-    // actually decoded and applied — Chromium lays out the document with
-    // .notdef glyphs (or nothing) and we get a blank PDF. fonts.ready
-    // resolves once every face declared on the page has loaded or failed.
-    await page.evaluate(() => document.fonts.ready);
     const pdfBuffer = await page.pdf({
       format: 'A4',
       printBackground: true,
