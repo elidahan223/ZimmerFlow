@@ -252,6 +252,17 @@ export default function BookingRequestModal({ onClose, onSubmitted, initialValue
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'שגיאה בשליחת בקשה')
 
+      // Backend created the bookings in PENDING_PAYMENT and started a
+      // Cardcom Low Profile deal — hand the customer over to Cardcom's
+      // hosted page. The payment redirect handler will land them on
+      // /payment/success or /payment/failure when they come back.
+      if (data.paymentUrl) {
+        window.location.href = data.paymentUrl
+        return
+      }
+
+      // Fallback (shouldn't happen once Cardcom env vars are configured):
+      // no payment URL returned, treat as legacy success.
       const firstId = data.bookings?.[0]?.id || ''
       setBookingId(firstId)
       setStep(3)

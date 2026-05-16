@@ -118,9 +118,15 @@ model Booking {
   guestsCount     Int           @map("guests_count")
   adults          Int           @default(2)
   children        Int           @default(0)
-  status          BookingStatus @default(PENDING)
+  status          BookingStatus @default(PENDING_PAYMENT)
   customerNotes   String?       @map("customer_notes")
   adminNotes      String?       @map("admin_notes")
+  // Bookings created from one request (potentially across multiple compounds)
+  // share a bookingGroupId so the deposit Payment can cover the whole group.
+  bookingGroupId  String?       @map("booking_group_id")
+  totalPrice      Decimal?      @map("total_price")
+  depositAmount   Decimal?      @map("deposit_amount")
+  depositPaidAt   DateTime?     @map("deposit_paid_at")
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
   completedAt     DateTime?     @map("completed_at")
@@ -132,7 +138,9 @@ model Booking {
   bookingRooms  BookingRoom[]
   contracts     Contract[]
   notifications Notification[]
+  payments      Payment[]
 
+  @@index([bookingGroupId])
   @@map("bookings")
 }
 
@@ -214,6 +222,38 @@ model Notification {
   @@map("notifications")
 }
 
+model Payment {
+  id                    String        @id @default(uuid())
+  bookingGroupId        String        @map("booking_group_id")
+  // Convenience FK to one of the bookings in the group so Prisma can join,
+  // but the source of truth for "which bookings does this payment cover" is
+  // bookingGroupId. The handler updates every booking sharing that group.
+  bookingId             String        @map("booking_id")
+  amount                Decimal
+  currency              String        @default("ILS")
+  type                  PaymentType
+  status                PaymentStatus @default(PENDING)
+  // Cardcom Low Profile identifiers
+  cardcomLowProfileId   String?       @map("cardcom_low_profile_id")
+  cardcomTransactionId  String?       @map("cardcom_transaction_id")
+  cardcomDealNumber     String?       @map("cardcom_deal_number")
+  cardLast4             String?       @map("card_last4")
+  // Raw responses we get from Cardcom (Create + GetLpResult + Webhook) so we
+  // can debug a stuck payment without re-hitting their API.
+  rawResponse           Json?         @map("raw_response")
+  errorMessage          String?       @map("error_message")
+  paidAt                DateTime?     @map("paid_at")
+  failedAt              DateTime?     @map("failed_at")
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@index([bookingGroupId])
+  @@index([cardcomLowProfileId])
+  @@map("payments")
+}
+
 model AuditLog {
   id         String   @id @default(uuid())
   actorId    String   @map("actor_user_id")
@@ -241,10 +281,26 @@ enum CompoundStatus {
 }
 
 enum BookingStatus {
+  PENDING_PAYMENT
   PENDING
   CONFIRMED
   CANCELLED
   COMPLETED
+}
+
+enum PaymentType {
+  DEPOSIT
+  REMAINDER
+  FULL
+  REFUND
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REFUNDED
 }
 
 enum ContractStatus {

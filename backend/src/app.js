@@ -13,6 +13,7 @@ const authRoutes = require('./routes/auth');
 const imageRoutes = require('./routes/images');
 const contractRoutes = require('./routes/contracts');
 const agentRoutes = require('./routes/agent');
+const paymentRoutes = require('./routes/payments');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -59,6 +60,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/images', imageRoutes);
 app.use('/api/contracts', contractRoutes);
 app.use('/api/agent', agentRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // 404 handler for unknown API routes
 app.use('/api', (req, res) => {

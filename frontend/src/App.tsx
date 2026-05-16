@@ -7,6 +7,7 @@ import Calendar from './features/calendar/Calendar'
 import Settings from './features/settings/Settings'
 import Notifications from './features/notifications/Notifications'
 import MyBookings from './features/booking/MyBookings'
+import PaymentResult from './features/booking/PaymentResult'
 import AuthModal from './features/auth/AuthModal'
 import AgentChat from './features/agent/AgentChat'
 import AccessibilityStatement from './features/accessibility/AccessibilityStatement'
@@ -14,9 +15,9 @@ import TermsOfUse from './features/legal/TermsOfUse'
 import PrivacyPolicy from './features/legal/PrivacyPolicy'
 import NotFound from './shared/NotFound'
 
-export type View = 'gallery' | 'calendar' | 'settings' | 'notifications' | 'my-bookings' | 'accessibility' | 'terms' | 'privacy' | 'not-found'
+export type View = 'gallery' | 'calendar' | 'settings' | 'notifications' | 'my-bookings' | 'accessibility' | 'terms' | 'privacy' | 'payment-success' | 'payment-failure' | 'not-found'
 
-const KNOWN_PATHS = new Set(['/', '/accessibility', '/terms', '/privacy'])
+const KNOWN_PATHS = new Set(['/', '/accessibility', '/terms', '/privacy', '/payment/success', '/payment/failure'])
 
 export interface CompoundTab {
   id: string
@@ -69,6 +70,10 @@ function App() {
       setView('terms')
     } else if (path === '/privacy' || hash === '#privacy') {
       setView('privacy')
+    } else if (path === '/payment/success') {
+      setView('payment-success')
+    } else if (path === '/payment/failure') {
+      setView('payment-failure')
     } else if (!KNOWN_PATHS.has(path)) {
       setView('not-found')
     }
@@ -103,6 +108,20 @@ function App() {
         {view === 'accessibility' && <AccessibilityStatement />}
         {view === 'terms' && <TermsOfUse />}
         {view === 'privacy' && <PrivacyPolicy />}
+        {view === 'payment-success' && (
+          <PaymentResult
+            outcome="success"
+            onGoHome={() => { window.history.replaceState({}, '', '/'); setView('gallery') }}
+            onGoMyBookings={() => { window.history.replaceState({}, '', '/'); setView('my-bookings') }}
+          />
+        )}
+        {view === 'payment-failure' && (
+          <PaymentResult
+            outcome="failure"
+            onGoHome={() => { window.history.replaceState({}, '', '/'); setView('gallery') }}
+            onGoMyBookings={() => { window.history.replaceState({}, '', '/'); setView('my-bookings') }}
+          />
+        )}
         {view === 'not-found' && <NotFound onGoHome={() => { window.history.replaceState({}, '', '/'); setView('gallery') }} />}
         <footer className="mt-16 border-t border-divider py-6 px-4 flex flex-wrap justify-center items-center gap-x-4 gap-y-2 label-airy text-[10px] text-charcoal-soft/50" dir="rtl">
           <button

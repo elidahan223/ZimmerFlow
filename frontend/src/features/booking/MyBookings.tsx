@@ -25,7 +25,7 @@ interface Contract {
 
 interface MyBooking {
   id: string
-  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED'
+  status: 'PENDING_PAYMENT' | 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED'
   checkIn: string
   checkOut: string
   guestsCount: number
@@ -43,6 +43,7 @@ function fmtDate(d: string) {
 }
 
 const STATUS_LABELS: Record<MyBooking['status'], { label: string; className: string; Icon: typeof CheckCircle }> = {
+  PENDING_PAYMENT: { label: 'ממתין לתשלום מקדמה', className: 'bg-amber-100 text-amber-800', Icon: Clock },
   PENDING: { label: 'ממתין לאישור', className: 'bg-amber-100 text-amber-800', Icon: Clock },
   CONFIRMED: { label: 'מאושר', className: 'bg-green-100 text-green-800', Icon: CheckCircle },
   CANCELLED: { label: 'בוטל', className: 'bg-red-100 text-red-700', Icon: XCircle },

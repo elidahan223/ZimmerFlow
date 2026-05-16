@@ -4,7 +4,7 @@
   "description": "ZimmerFlow - Cabin booking management system",
   "main": "src/app.js",
   "scripts": {
-    "start": "node src/app.js",
+    "start": "prisma db push --skip-generate --accept-data-loss && node src/app.js",
     "dev": "nodemon src/app.js",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",

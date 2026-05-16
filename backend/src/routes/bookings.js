@@ -1,10 +1,21 @@
+const crypto = require('crypto');
 const express = require('express');
 const router = express.Router();
 const prisma = require('../config/database');
 const { requireOwner, requireAuth } = require('../middleware/auth');
 const { deleteContract } = require('../services/s3');
 const { generateContractPdf } = require('../services/contractPdfService');
+const { createLowProfileDeal } = require('../services/cardcomService');
+const { deleteBookingGroup } = require('../services/bookingCleanup');
 const { bookingLimit } = require('../middleware/rateLimit');
+
+// Bookings that should be treated as "blocking" for availability/overlap
+// checks: anything that's actively reserved or paid for. PENDING_PAYMENT
+// must be in this list so a room isn't given away during the 5-minute
+// window the customer is at the Cardcom payment page.
+const ACTIVE_STATUSES = ['PENDING_PAYMENT', 'PENDING', 'CONFIRMED'];
+
+const DEPOSIT_FRACTION = 0.20;
 
 const bookingInclude = {
   customer: true,
@@ -18,7 +29,7 @@ router.get('/availability', async (req, res, next) => {
   try {
     const { compoundId, roomId, from, to } = req.query;
     const where = {
-      status: { in: ['PENDING', 'CONFIRMED'] },
+      status: { in: ACTIVE_STATUSES },
     };
     if (compoundId) where.compoundId = compoundId;
     if (roomId) where.bookingRooms = { some: { roomId } };
@@ -215,6 +226,15 @@ router.post('/request', bookingLimit, requireAuth, async (req, res, next) => {
       return res.status(500).json({ error: 'שגיאה ביצירת קובץ החוזה' });
     }
 
+    // Group all bookings created from this one request under a shared id so
+    // the single deposit Payment can cover them as a unit (confirm them all
+    // on success, cancel them all on failure).
+    const bookingGroupId = crypto.randomUUID();
+    const totalPriceNum = Number(totalPrice) || 0;
+    const depositAmount = totalPriceNum > 0
+      ? Math.round(totalPriceNum * DEPOSIT_FRACTION * 100) / 100
+      : 0;
+
     // Race-safe booking creation: re-check overlaps INSIDE a Serializable transaction.
     // Postgres will abort one transaction with code 40001 if two concurrent bookings
     // would conflict. We retry up to 3 times on serialization failure.
@@ -231,7 +251,7 @@ router.post('/request', bookingLimit, requireAuth, async (req, res, next) => {
                   where: {
                     roomId: { in: c.roomIds },
                     booking: {
-                      status: { in: ['PENDING', 'CONFIRMED'] },
+                      status: { in: ACTIVE_STATUSES },
                       checkIn: { lt: new Date(checkOut) },
                       checkOut: { gt: new Date(checkIn) },
                     },
@@ -247,7 +267,7 @@ router.post('/request', bookingLimit, requireAuth, async (req, res, next) => {
                 const overlap = await tx.booking.findFirst({
                   where: {
                     compoundId: c.compoundId,
-                    status: { in: ['PENDING', 'CONFIRMED'] },
+                    status: { in: ACTIVE_STATUSES },
                     checkIn: { lt: new Date(checkOut) },
                     checkOut: { gt: new Date(checkIn) },
                   },
@@ -272,8 +292,11 @@ router.post('/request', bookingLimit, requireAuth, async (req, res, next) => {
                   guestsCount: guestsCount || ((adults || 2) + (children || 0)),
                   adults: adults || 2,
                   children: children || 0,
-                  status: 'PENDING',
+                  status: 'PENDING_PAYMENT',
                   customerNotes: customerNotes || null,
+                  bookingGroupId,
+                  totalPrice: totalPriceNum,
+                  depositAmount,
                   ...(c.roomIds.length > 0 && {
                     bookingRooms: { create: c.roomIds.map((roomId) => ({ roomId })) },
                   }),
@@ -331,7 +354,81 @@ router.post('/request', bookingLimit, requireAuth, async (req, res, next) => {
       throw txErr;
     }
 
-    res.status(201).json({ bookings: created.map((c) => c.booking), contractKey });
+    // ── Create Cardcom Low Profile session for the deposit ────────────────
+    // The bookings are PENDING_PAYMENT until Cardcom confirms; the redirect
+    // handler / webhook will flip them to CONFIRMED or CANCELLED. If we
+    // can't even reach Cardcom to create the session, cancel everything
+    // immediately so the rooms aren't held indefinitely.
+    const firstBookingId = created[0].booking.id;
+    const payment = await prisma.payment.create({
+      data: {
+        bookingGroupId,
+        bookingId: firstBookingId,
+        amount: depositAmount,
+        type: 'DEPOSIT',
+        status: 'PENDING',
+      },
+    });
+
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    const backendBase = `${protocol}://${host}`;
+    const compoundNames = compoundDetails.map((c) => c.compoundName).join(', ');
+
+    let paymentUrl;
+    try {
+      const deal = await createLowProfileDeal({
+        amount: depositAmount,
+        returnValue: payment.id,
+        productName: `מקדמה 20% - ${compoundNames}`,
+        successRedirectUrl: `${backendBase}/api/payments/redirect/success`,
+        failedRedirectUrl: `${backendBase}/api/payments/redirect/failure`,
+        webhookUrl: `${backendBase}/api/payments/webhook`,
+        customerName: pdfData.customerName,
+        customerEmail: req.user.email || undefined,
+        customerIdNumber: pdfData.customerIdNumber || undefined,
+        language: 'he',
+        // Cardcom produces a TaxInvoiceAndReceipt and emails it to the
+        // customer after a successful charge, but only if we actually have
+        // an email address to send it to AND the env var is on. The env
+        // gate exists so we can deploy the rest of the flow before the
+        // Cardcom account is fully provisioned for invoice issuance —
+        // otherwise a rejected Document field would block every booking.
+        issueInvoice: process.env.CARDCOM_ISSUE_INVOICE === 'true' && Boolean(req.user.email),
+      });
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { cardcomLowProfileId: deal.lowProfileId, rawResponse: deal.raw },
+      });
+      paymentUrl = deal.url;
+    } catch (cardErr) {
+      console.error('[bookings] Cardcom session creation failed:', cardErr.message);
+      // Nothing should be saved if the customer can't even start paying.
+      // Hard-delete in dependency order (signatureEvents → contracts →
+      // notifications → payments → bookings) — bookingRooms cascade with
+      // bookings. Earlier we just called contract.deleteMany() which
+      // failed silently when signatureEvents existed and left zombies.
+      try {
+        await deleteBookingGroup(bookingGroupId);
+      } catch (cleanupErr) {
+        console.error('[bookings] cleanup after Cardcom failure failed:', cleanupErr.message);
+      }
+      await deleteContract(contractKey).catch(() => {});
+      return res.status(502).json({ error: 'שגיאה ביצירת חיבור לסליקה. נסה שוב מאוחר יותר.' });
+    }
+
+    res.status(201).json({
+      bookings: created.map((c) => c.booking),
+      contractKey,
+      bookingGroupId,
+      payment: {
+        id: payment.id,
+        amount: depositAmount,
+        type: 'DEPOSIT',
+        currency: 'ILS',
+      },
+      paymentUrl,
+    });
   } catch (err) {
     next(err);
   }
@@ -353,7 +450,7 @@ router.post('/', requireOwner, async (req, res, next) => {
         where: {
           roomId: { in: roomIds },
           booking: {
-            status: { in: ['PENDING', 'CONFIRMED'] },
+            status: { in: ACTIVE_STATUSES },
             checkIn: { lt: new Date(checkOut) },
             checkOut: { gt: new Date(checkIn) },
           },
@@ -368,7 +465,7 @@ router.post('/', requireOwner, async (req, res, next) => {
       const overlap = await prisma.booking.findFirst({
         where: {
           compoundId,
-          status: { in: ['PENDING', 'CONFIRMED'] },
+          status: { in: ACTIVE_STATUSES },
           checkIn: { lt: new Date(checkOut) },
           checkOut: { gt: new Date(checkIn) },
         },
@@ -443,7 +540,7 @@ router.put('/:id', requireOwner, async (req, res, next) => {
             roomId: { in: newRoomIds },
             booking: {
               id: { not: req.params.id },
-              status: { in: ['PENDING', 'CONFIRMED'] },
+              status: { in: ACTIVE_STATUSES },
               checkIn: { lt: new Date(checkOut || existing.checkOut) },
               checkOut: { gt: new Date(checkIn || existing.checkIn) },
             },
