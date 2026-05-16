@@ -7,33 +7,31 @@ const path = require('path');
 const fs = require('fs');
 const { uploadContractBuffer } = require('./s3');
 
-// Inline fontsource's per-script Rubik subsets as base64 data URLs inside
-// the CSS so PDF rendering has zero runtime network dependency. We use
-// two small WOFF2 files (~25KB each) and let chromium pick the right
-// face per code point via unicode-range. A single full Rubik TTF was
-// 360KB and produced a 500KB HTML that chromium choked on, generating
-// 5KB blank PDFs (confirmed in the size logs).
+// Inline both fonts as base64 data URLs inside the CSS so PDF rendering
+// has zero runtime network dependency. Two separate family-names: chromium
+// tries the first and falls through to the next when a glyph is missing.
+// Avoids the unicode-range approach which silently produced 9KB blank
+// PDFs in gh-17 (chromium apparently can't combine unicode-range with
+// data: WOFF2 reliably).
 const FONTS_DIR = path.join(__dirname, '..', '..', 'fonts');
 
-function loadFontFace(filename, family, unicodeRange) {
+function loadFontFace(filename, family, mime, format) {
   const filePath = path.join(FONTS_DIR, filename);
   if (!fs.existsSync(filePath)) {
-    console.warn(`[contractPdf] font missing at ${filePath} — text using ${family}/${unicodeRange} will not render`);
+    console.warn(`[contractPdf] font missing at ${filePath} — text using ${family} will not render`);
     return '';
   }
   const fontBuffer = fs.readFileSync(filePath);
   const fontBase64 = fontBuffer.toString('base64');
-  console.log(`[contractPdf] embedded ${filename}: ${fontBuffer.length} bytes -> ${fontBase64.length} base64 chars`);
-  return `@font-face { font-family: '${family}'; src: url(data:font/woff2;base64,${fontBase64}) format('woff2'); font-weight: normal; font-style: normal; font-display: block; unicode-range: ${unicodeRange}; }`;
+  console.log(`[contractPdf] embedded ${filename} as ${family}: ${fontBuffer.length} bytes -> ${fontBase64.length} base64 chars`);
+  return `@font-face { font-family: '${family}'; src: url(data:${mime};base64,${fontBase64}) format('${format}'); font-weight: normal; font-style: normal; font-display: block; }`;
 }
 
 let HEBREW_FONT_FACE = '';
 try {
   HEBREW_FONT_FACE = [
-    // Latin block + digits + punctuation (basic ASCII + Latin-1 supplement)
-    loadFontFace('Rubik-Latin.woff2', 'Rubik', 'U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215'),
-    // Hebrew block + presentation forms
-    loadFontFace('Rubik-Hebrew.woff2', 'Rubik', 'U+0590-05FF, U+FB1D-FB4F'),
+    loadFontFace('NotoSansHebrew-Regular.ttf', 'NotoSansHebrew', 'font/ttf', 'truetype'),
+    loadFontFace('Rubik-Latin.woff2', 'RubikLatin', 'font/woff2', 'woff2'),
   ].join('\n');
 } catch (e) {
   console.error('[contractPdf] failed to load fonts for embedding:', e.message);
@@ -104,7 +102,7 @@ function createContractHtml(data) {
     ${HEBREW_FONT_FACE}
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'Rubik', sans-serif;
+      font-family: 'NotoSansHebrew', 'RubikLatin', sans-serif;
       direction: rtl; text-align: right;
       padding: 40px 50px; color: #111;
       font-size: 13px; line-height: 1.7;

@@ -42,18 +42,17 @@ jobs:
         working-directory: backend
         run: npx prisma generate
 
-      - name: Download Rubik subset fonts for contract PDFs
+      - name: Download Hebrew + Latin fonts for contract PDFs
         working-directory: backend
         run: |
-          # contractPdfService.js base64-embeds these WOFF2 files inside
-          # @font-face so chromium on EB doesn't need to fetch a webfont at
-          # runtime. Use fontsource's per-script subsets — each ~25KB —
-          # instead of the full variable Rubik (~360KB) that choked chromium
-          # into producing 5KB blank PDFs.
+          # contractPdfService.js base64-embeds these into @font-face so
+          # chromium on EB has zero runtime network dependency. Hebrew via
+          # NotoSansHebrew TTF (proven to render in gh-13) — small at 26KB.
+          # Latin/digits via fontsource's Rubik latin subset (~19KB WOFF2).
           mkdir -p fonts
           curl -sSL --fail \
-            -o fonts/Rubik-Hebrew.woff2 \
-            "https://cdn.jsdelivr.net/npm/@fontsource/rubik@5/files/rubik-hebrew-400-normal.woff2"
+            -o fonts/NotoSansHebrew-Regular.ttf \
+            https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf
           curl -sSL --fail \
             -o fonts/Rubik-Latin.woff2 \
             "https://cdn.jsdelivr.net/npm/@fontsource/rubik@5/files/rubik-latin-400-normal.woff2"
