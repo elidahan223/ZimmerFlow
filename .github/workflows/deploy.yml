@@ -42,15 +42,20 @@ jobs:
         working-directory: backend
         run: npx prisma generate
 
-      - name: Download Noto Sans Hebrew font for contract PDFs
+      - name: Download Noto fonts for contract PDFs
         working-directory: backend
         run: |
-          # contractPdfService.js inlines this TTF as base64 inside @font-face
-          # so chromium on EB doesn't need to fetch a webfont at runtime.
+          # contractPdfService.js inlines these TTFs as base64 inside
+          # @font-face so chromium on EB doesn't need to fetch a webfont at
+          # runtime. NotoSansHebrew covers Hebrew glyphs; NotoSans covers
+          # digits, Latin letters and punctuation that NotoSansHebrew lacks.
           mkdir -p fonts
           curl -sSL --fail \
             -o fonts/NotoSansHebrew-Regular.ttf \
             https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf
+          curl -sSL --fail \
+            -o fonts/NotoSans-Regular.ttf \
+            https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf
           ls -lh fonts/
 
       - name: Build deployment ZIP (includes node_modules)

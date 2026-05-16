@@ -7,22 +7,32 @@ const path = require('path');
 const fs = require('fs');
 const { uploadContractBuffer } = require('./s3');
 
-// Inline the Hebrew font as a base64 data URL inside the CSS so the PDF
-// rendering has zero runtime network dependency. Loaded once at module
-// init so we don't re-read the file on every contract.
-const HEBREW_FONT_PATH = path.join(__dirname, '..', '..', 'fonts', 'NotoSansHebrew-Regular.ttf');
+// Inline both Hebrew and Latin fonts as base64 data URLs inside the CSS so
+// the PDF rendering has zero runtime network dependency. NotoSansHebrew
+// covers Hebrew glyphs only — digits, Latin letters and punctuation come
+// from NotoSans. Both loaded once at module init.
+const FONTS_DIR = path.join(__dirname, '..', '..', 'fonts');
+
+function loadFontFace(filename, family) {
+  const filePath = path.join(FONTS_DIR, filename);
+  if (!fs.existsSync(filePath)) {
+    console.warn(`[contractPdf] font missing at ${filePath} — text using ${family} will not render`);
+    return '';
+  }
+  const fontBuffer = fs.readFileSync(filePath);
+  const fontBase64 = fontBuffer.toString('base64');
+  console.log(`[contractPdf] embedded ${family}: ${fontBuffer.length} bytes -> ${fontBase64.length} base64 chars`);
+  return `@font-face { font-family: '${family}'; src: url(data:font/ttf;base64,${fontBase64}) format('truetype'); font-weight: normal; font-style: normal; font-display: block; }`;
+}
+
 let HEBREW_FONT_FACE = '';
 try {
-  if (fs.existsSync(HEBREW_FONT_PATH)) {
-    const fontBuffer = fs.readFileSync(HEBREW_FONT_PATH);
-    const fontBase64 = fontBuffer.toString('base64');
-    HEBREW_FONT_FACE = `@font-face { font-family: 'NotoSansHebrew'; src: url(data:font/ttf;base64,${fontBase64}) format('truetype'); font-weight: normal; font-style: normal; font-display: block; }`;
-    console.log(`[contractPdf] embedded Hebrew font: ${fontBuffer.length} bytes -> ${fontBase64.length} base64 chars`);
-  } else {
-    console.warn(`[contractPdf] Hebrew font missing at ${HEBREW_FONT_PATH} — Hebrew text will not render in PDFs`);
-  }
+  HEBREW_FONT_FACE = [
+    loadFontFace('NotoSans-Regular.ttf', 'NotoSans'),
+    loadFontFace('NotoSansHebrew-Regular.ttf', 'NotoSansHebrew'),
+  ].join('\n');
 } catch (e) {
-  console.error('[contractPdf] failed to load Hebrew font for embedding:', e.message);
+  console.error('[contractPdf] failed to load fonts for embedding:', e.message);
 }
 
 const getBrowser = async () => {
@@ -90,7 +100,7 @@ function createContractHtml(data) {
     ${HEBREW_FONT_FACE}
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'NotoSansHebrew', Arial, sans-serif;
+      font-family: 'NotoSansHebrew', 'NotoSans', sans-serif;
       direction: rtl; text-align: right;
       padding: 40px 50px; color: #111;
       font-size: 13px; line-height: 1.7;
